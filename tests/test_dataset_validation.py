@@ -102,6 +102,8 @@ def test_validate_dataset_accepts_complete_dataset() -> None:
     assert summary.vertical_staggered_levels == 4
     assert "available with caveats" in summary.to_markdown()
     assert "T0 = 300 K" in summary.to_markdown()
+    diagnostics = {diagnostic.name: diagnostic for diagnostic in summary.diagnostics}
+    assert diagnostics["Heuristic severity"].status == "available with caveats"
 
 
 def test_validate_dataset_reports_missing_inputs_and_raises_on_request() -> None:
@@ -150,6 +152,10 @@ def test_main_writes_artifacts_even_when_validation_fails(tmp_path: Path, monkey
     assert not any(output_dir.glob("phase3_approximate_icing_risk_*.json"))
     assert not any(output_dir.glob("phase3_approximate_icing_risk_*.nc"))
     assert not any(output_dir.glob("phase3_approximate_icing_risk_*.png"))
+    assert not any(output_dir.glob("phase4_heuristic_severity_*.md"))
+    assert not any(output_dir.glob("phase4_heuristic_severity_*.json"))
+    assert not any(output_dir.glob("phase4_heuristic_severity_*.nc"))
+    assert not any(output_dir.glob("phase4_heuristic_severity_*.png"))
 
 
 def test_invalid_summary_does_not_claim_missing_diagnostics_are_supported() -> None:
@@ -164,6 +170,9 @@ def test_invalid_summary_does_not_claim_missing_diagnostics_are_supported() -> N
     assert "bottom_top_stag" in report.missing_dimensions
     assert diagnostics["Approximate icing risk"].status == "unsupported"
     assert "ZNW" in diagnostics["Approximate icing risk"].reason
+    assert diagnostics["Heuristic severity"].status == "unsupported"
+    assert "QRAIN" in diagnostics["Heuristic severity"].reason
+    assert "ZNW" in diagnostics["Heuristic severity"].reason
 
 
 @pytest.mark.parametrize(
@@ -222,6 +231,10 @@ def test_main_writes_phase2_artifacts_for_selected_time(tmp_path: Path, monkeypa
     phase3_json = sorted(output_dir.glob("phase3_approximate_icing_risk_*.json"))
     phase3_netcdf = sorted(output_dir.glob("phase3_approximate_icing_risk_*.nc"))
     phase3_png = sorted(output_dir.glob("phase3_approximate_icing_risk_*.png"))
+    phase4_markdown = sorted(output_dir.glob("phase4_heuristic_severity_*.md"))
+    phase4_json = sorted(output_dir.glob("phase4_heuristic_severity_*.json"))
+    phase4_netcdf = sorted(output_dir.glob("phase4_heuristic_severity_*.nc"))
+    phase4_png = sorted(output_dir.glob("phase4_heuristic_severity_*.png"))
 
     assert len(phase2_markdown) == 1
     assert len(phase2_json) == 1
@@ -235,3 +248,10 @@ def test_main_writes_phase2_artifacts_for_selected_time(tmp_path: Path, monkeypa
     phase3_markdown_text = phase3_markdown[0].read_text(encoding="utf-8")
     assert "theta = T + 300 K" in phase3_markdown_text
     assert "Approximate icing risk in selected time: present" in phase3_markdown_text
+    assert len(phase4_markdown) == 1
+    assert len(phase4_json) == 1
+    assert len(phase4_netcdf) == 1
+    assert len(phase4_png) == 1
+    phase4_markdown_text = phase4_markdown[0].read_text(encoding="utf-8")
+    assert "Severity class" in phase4_markdown_text
+    assert "Relative bands" in phase4_markdown_text

@@ -178,6 +178,24 @@ def _build_diagnostics(dataset: xr.Dataset, validation: ValidationReport) -> tup
                 reason="PB is absent, so the risk product remains approximate and must use T + 300, P and ZNW as a proxy path.",
             )
         )
+    severity_required = {"QCLOUD", "QRAIN", "QICE", "T", "P", "ZNW"}
+    severity_missing = sorted(severity_required & missing_variables)
+    if severity_missing:
+        diagnostics.append(
+            DiagnosticStatus(
+                name="Heuristic severity",
+                status="unsupported",
+                reason=f"missing required inputs for the heuristic layer: {', '.join(severity_missing)}.",
+            )
+        )
+    else:
+        diagnostics.append(
+            DiagnosticStatus(
+                name="Heuristic severity",
+                status="available with caveats",
+                reason="severity is available as a documented heuristic built on the approximate risk product and relative model levels.",
+            )
+        )
     return tuple(diagnostics)
 
 

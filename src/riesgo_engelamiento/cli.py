@@ -8,6 +8,7 @@ from .config import DEFAULT_DATASET_NAME, DEFAULT_OUTPUT_DIR_NAME
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
 from .phase2 import build_phase2_liquid_product, write_phase2_outputs
 from .phase3 import build_phase3_approximate_risk_product, write_phase3_outputs
+from .phase4 import build_phase4_heuristic_severity_product, write_phase4_outputs
 from .summary import build_phase1_summary, write_phase1_outputs
 
 
@@ -78,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
                 phase3_product,
                 args.output_dir,
             )
+            phase4_product = build_phase4_heuristic_severity_product(dataset, args.dataset, time_index=args.time_index)
+            phase4_markdown_path, phase4_json_path, phase4_netcdf_path, phase4_png_path = write_phase4_outputs(
+                phase4_product,
+                args.output_dir,
+            )
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -115,4 +121,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"JSON summary written to: {phase3_json_path}")
     print(f"NetCDF risk product written to: {phase3_netcdf_path}")
     print(f"PNG risk product written to: {phase3_png_path}")
+    print()
+    print(phase4_product.to_markdown(
+        {
+            "markdown": phase4_markdown_path,
+            "json": phase4_json_path,
+            "netcdf": phase4_netcdf_path,
+            "png": phase4_png_path,
+        }
+    ))
+    print()
+    print(f"Markdown summary written to: {phase4_markdown_path}")
+    print(f"JSON summary written to: {phase4_json_path}")
+    print(f"NetCDF severity product written to: {phase4_netcdf_path}")
+    print(f"PNG severity product written to: {phase4_png_path}")
     return 0
