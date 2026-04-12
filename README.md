@@ -5,12 +5,14 @@ Pipeline reproducible en Python para validar una salida WRF, documentar sus limi
 ## Quick Start
 1. Instalar dependencias para desarrollo y pruebas: `uv sync --extra dev`
 2. Ejecutar la validación y las fases 2, 5 y 6 contra el dataset del repositorio: `uv run riesgo-engelamiento --time-index 0`
-3. Revisar los artefactos generados en `outputs/`
+3. Ejecutar la ruta de producto final de presentacion, si se quiere el resumen trazable y el mapa de presentacion para el tiempo seleccionado: `uv run riesgo-engelamiento --time-index 0 --final-product`
+4. Revisar los artefactos generados en `outputs/`
 
 ## Commands
 | Command | Description |
 |---|---|
 | `uv run riesgo-engelamiento --time-index 0` | Valida el dataset, genera el resumen de fase 1 y exporta los productos de fases 2, 5 y 6 |
+| `uv run riesgo-engelamiento --time-index 0 --final-product` | Ejecuta el flujo anterior y ademas exporta el artefacto final de presentacion, con mapa PNG de footprint o severidad espacial, para el tiempo seleccionado |
 | `uv run --extra dev pytest` | Ejecuta la batería de pruebas |
 
 ## Architecture
@@ -20,6 +22,7 @@ Pipeline reproducible en Python para validar una salida WRF, documentar sus limi
 - `src/riesgo_engelamiento/phase5.py`: reconstrucción aproximada de theta, presión y riesgo de engelamiento.
 - `src/riesgo_engelamiento/phase3.py`: alias de compatibilidad para la Phase 5.
 - `src/riesgo_engelamiento/phase6.py`: severidad heurística canónica y rangos relativos de niveles.
+- `src/riesgo_engelamiento/final_product.py`: contrato, resumen y mapa de presentacion del artefacto final.
 - `src/riesgo_engelamiento/phase4.py`: alias de compatibilidad para la severidad heurística.
 - `src/riesgo_engelamiento/cli.py`: entrada principal reproducible.
 
@@ -35,4 +38,5 @@ Pipeline reproducible en Python para validar una salida WRF, documentar sus limi
 - La fase 2 produce una máscara binaria horizontal a partir de `QCLOUD + QRAIN` para un tiempo seleccionado.
 - La fase 5 reconstruye `theta = T + 300`, aproxima la presión desde `ZNW` y `P`, y etiqueta el riesgo como proxy documentado porque `PB` no está disponible.
 - La fase 6 clasifica la severidad de forma heurística a partir del riesgo aproximado, la fracción líquida, la coexistencia con hielo, la persistencia temporal y la ocupación relativa por bandas de `eta`.
+- El artefacto final de presentacion es una capa separada, trazable y centrada en un tiempo seleccionado; reutiliza la fase diagnostica elegida en lugar de recomputar la fisica.
 

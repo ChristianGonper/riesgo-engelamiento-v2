@@ -5,6 +5,32 @@ from dataclasses import dataclass
 CORE_T0_K = 300.0
 DEFAULT_DATASET_NAME = "wrfout_d01_2015-04-17_18_00_00_corte"
 DEFAULT_OUTPUT_DIR_NAME = "outputs"
+FINAL_PRODUCT_OUTPUT_PREFIX = "presentation_final_product"
+FINAL_PRODUCT_OUTPUT_PURPOSE = "presentation/final-product"
+FINAL_PRODUCT_RENDER_VIEWS = (
+    "approximate-risk",
+    "heuristic-severity",
+)
+FINAL_PRODUCT_CAVEAT_LABELS = (
+    "selected-time presentation wrapper over diagnostic phases",
+    "diagnostic source remains a proxy, not an operational forecast",
+    "geometric altitude is still out of scope for this project slice",
+)
+FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
+    "artifact_kind",
+    "output_purpose",
+    "source_mode",
+    "render_view",
+    "source_phase",
+    "map_field_kind",
+    "map_semantics",
+    "selected_time_index",
+    "selected_time_label",
+    "caveat_labels",
+    "source_artifacts",
+    "source_metrics",
+    "outputs",
+)
 APPROXIMATE_PRESSURE_TOP_PA = 5000.0
 APPROXIMATE_PRESSURE_SURFACE_PA = 100000.0
 APPROXIMATE_POISSON_KAPPA = 0.286
