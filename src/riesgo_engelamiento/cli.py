@@ -8,7 +8,7 @@ from .config import DEFAULT_DATASET_NAME, DEFAULT_OUTPUT_DIR_NAME
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
 from .phase2 import build_phase2_liquid_product, write_phase2_outputs
 from .phase5 import build_phase5_approximate_risk_product, write_phase5_outputs
-from .phase4 import build_phase4_heuristic_severity_product, write_phase4_outputs
+from .phase6 import build_phase6_heuristic_severity_product, write_phase6_outputs
 from .summary import build_phase1_summary, write_phase1_outputs
 
 
@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--time-index",
         type=int,
         default=0,
-        help="Indice de tiempo a usar para las fases 2 y 5.",
+        help="Indice de tiempo a usar para las fases 2, 5 y 6.",
     )
     return parser
 
@@ -79,9 +79,9 @@ def main(argv: list[str] | None = None) -> int:
                 phase5_product,
                 args.output_dir,
             )
-            phase4_product = build_phase4_heuristic_severity_product(dataset, args.dataset, time_index=args.time_index)
-            phase4_markdown_path, phase4_json_path, phase4_netcdf_path, phase4_png_path = write_phase4_outputs(
-                phase4_product,
+            phase6_product = build_phase6_heuristic_severity_product(dataset, args.dataset, time_index=args.time_index)
+            phase6_markdown_path, phase6_json_path, phase6_netcdf_path, phase6_png_path = write_phase6_outputs(
+                phase6_product,
                 args.output_dir,
             )
         except ValueError as exc:
@@ -122,17 +122,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"NetCDF approximate-risk proxy written to: {phase5_netcdf_path}")
     print(f"PNG risk product written to: {phase5_png_path}")
     print()
-    print(phase4_product.to_markdown(
+    print(phase6_product.to_markdown(
         {
-            "markdown": phase4_markdown_path,
-            "json": phase4_json_path,
-            "netcdf": phase4_netcdf_path,
-            "png": phase4_png_path,
-        }
+            "markdown": phase6_markdown_path,
+            "json": phase6_json_path,
+            "netcdf": phase6_netcdf_path,
+            "png": phase6_png_path,
+        },
+        phase_number=6,
     ))
     print()
-    print(f"Markdown summary written to: {phase4_markdown_path}")
-    print(f"JSON summary written to: {phase4_json_path}")
-    print(f"NetCDF severity product written to: {phase4_netcdf_path}")
-    print(f"PNG severity product written to: {phase4_png_path}")
+    print(f"Markdown summary written to: {phase6_markdown_path}")
+    print(f"JSON summary written to: {phase6_json_path}")
+    print(f"NetCDF heuristic severity product written to: {phase6_netcdf_path}")
+    print(f"PNG heuristic severity product written to: {phase6_png_path}")
     return 0

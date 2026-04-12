@@ -62,14 +62,14 @@ SUPPORTED_DIAGNOSTICS = (
     "ice-context support from QICE",
     "relative vertical structure in model levels / eta coordinates",
     "approximate thermodynamics and icing risk through the documented phase-5 eta proxy",
-    "heuristic severity classification from the approximate risk product",
+    "phase-6 heuristic severity classification from the approximate risk product",
 )
 
 LIMITATIONS = (
     "PB is absent, so exact pressure and exact temperature reconstruction are not possible; the phase-5 risk product uses an explicit proxy.",
     "PH, PHB and HGT are absent, so geometric altitude products are out of scope for phase 1.",
     "The phase-2 liquid mask is a horizontal binary proxy and does not yet estimate icing severity.",
-    "The phase-4 severity product is heuristic and intentionally relative to model levels, persistence and mixed-phase context.",
+    "The phase-6 severity product is heuristic and intentionally relative to model levels, persistence and mixed-phase context.",
 )
 
 ASSUMPTIONS = (
@@ -77,7 +77,7 @@ ASSUMPTIONS = (
     "The phase-5 pressure proxy interpolates between 1000 hPa and 50 hPa in eta coordinates and then adds the perturbation pressure P.",
     "Vertical results are expressed in model levels or eta-relative coordinates, not in meters or feet.",
     "The first phase is a reproducible script pipeline instead of a notebook-first workflow.",
-    "The phase-4 severity classification uses documented thresholds on risk fraction, liquid fraction, mixed-phase context and persistence.",
+    "The phase-6 severity classification uses documented thresholds on risk fraction, liquid fraction, mixed-phase context and persistence.",
 )
 
 

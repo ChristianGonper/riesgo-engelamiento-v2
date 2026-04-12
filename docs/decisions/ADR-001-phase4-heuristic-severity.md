@@ -1,7 +1,7 @@
 # ADR-001: Heuristic severity on top of approximate icing risk
 
 ## Status
-Accepted
+Superseded by ADR-003
 
 ## Date
 2026-04-12

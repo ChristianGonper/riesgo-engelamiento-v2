@@ -71,9 +71,16 @@ class Phase4HeuristicSeverityProduct:
     dominant_band: str
     heuristic_notes: tuple[str, ...]
 
-    def to_dict(self, output_paths: dict[str, Path] | None = None) -> dict[str, Any]:
+    def to_dict(
+        self,
+        output_paths: dict[str, Path] | None = None,
+        *,
+        phase_number: int = 4,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "dataset_path": str(self.dataset_path),
+            "phase": phase_number,
+            "product_kind": "heuristic proxy",
             "time_index": self.time_index,
             "time_label": self.time_label,
             "horizontal_shape": list(self.horizontal_shape),
@@ -106,7 +113,12 @@ class Phase4HeuristicSeverityProduct:
             payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
         return payload
 
-    def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
+    def to_markdown(
+        self,
+        output_paths: dict[str, Path] | None = None,
+        *,
+        phase_number: int = 4,
+    ) -> str:
         def _table(headers: list[str], rows: list[list[str]]) -> str:
             if not rows:
                 rows = [["none" for _ in headers]]
@@ -151,9 +163,10 @@ class Phase4HeuristicSeverityProduct:
         ]
 
         lines = [
-            "# Fase 4: severidad heuristica y rangos relativos del modelo",
+            f"# Fase {phase_number}: severidad heuristica y rangos relativos del modelo",
             "",
             f"- Dataset: `{self.dataset_path}`",
+            "- Product kind: heuristic proxy",
             f"- Time index: {self.time_index}",
             f"- Time label: {self.time_label or 'unknown'}",
             f"- Horizontal grid: {self.horizontal_shape[0]} x {self.horizontal_shape[1]}",
@@ -186,6 +199,9 @@ class Phase4HeuristicSeverityProduct:
             lines.extend(["", "## Outputs"])
             lines.extend(f"- {name}: `{path}`" for name, path in output_paths.items())
         return "\n".join(lines)
+
+
+Phase6HeuristicSeverityProduct = Phase4HeuristicSeverityProduct
 
 
 def _coerce_time_value(value: Any) -> str | None:
@@ -337,7 +353,7 @@ def _severity_score(
     return xr.where(risk_horizontal_fraction > 0, score, 0.0)
 
 
-def _build_output_dataset(product: Phase4HeuristicSeverityProduct) -> xr.Dataset:
+def _build_output_dataset(product: Phase4HeuristicSeverityProduct, *, phase_number: int = 4) -> xr.Dataset:
     band_coord = xr.DataArray([band.name for band in product.band_summaries], dims=("severity_band",))
     severity_class_index = xr.DataArray(
         np.asarray([{"none": 0, "low": 1, "moderate": 2, "high": 3, "severe": 4}[name] for name in product.severity_class_time], dtype=np.uint8),
@@ -410,7 +426,9 @@ def _build_output_dataset(product: Phase4HeuristicSeverityProduct) -> xr.Dataset
             "severity_band": band_coord,
         },
         attrs={
-            "title": "Phase 4 heuristic severity diagnostic",
+            "title": f"Phase {phase_number} heuristic severity diagnostic",
+            "phase": phase_number,
+            "product_kind": "heuristic proxy",
             "source_dataset": str(product.dataset_path),
             "time_index": product.time_index,
             "time_label": product.time_label or "unknown",
@@ -427,8 +445,9 @@ def _build_output_dataset(product: Phase4HeuristicSeverityProduct) -> xr.Dataset
     )
 
 
-def _render_severity_figure(product: Phase4HeuristicSeverityProduct, output_path: Path) -> None:
+def _render_severity_figure(product: Phase4HeuristicSeverityProduct, output_path: Path, *, phase_number: int = 4) -> None:
     fig, axes = plt.subplots(3, 1, figsize=(12, 12), constrained_layout=True, gridspec_kw={"height_ratios": [2.2, 1.0, 1.0]})
+    fig.suptitle(f"Phase {phase_number}: heuristic severity proxy")
     time_positions = np.arange(product.time_risk_level_fraction.sizes["Time"])
     time_labels = [_coerce_time_value(value) or str(index) for index, value in enumerate(product.time_risk_horizontal_fraction.coords["Time"].values)]
 
@@ -606,14 +625,24 @@ def build_phase4_heuristic_severity_product(
     )
 
 
-def write_phase4_outputs(
+def build_phase6_heuristic_severity_product(
+    dataset: xr.Dataset,
+    dataset_path: str | Path,
+    time_index: int = 0,
+) -> Phase6HeuristicSeverityProduct:
+    return build_phase4_heuristic_severity_product(dataset, dataset_path, time_index=time_index)
+
+
+def _write_heuristic_severity_outputs(
     product: Phase4HeuristicSeverityProduct,
     output_dir: str | Path,
+    *,
+    phase_number: int,
 ) -> tuple[Path, Path, Path, Path]:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    base_name = f"phase4_heuristic_severity_t{product.time_index:03d}"
+    base_name = f"phase{phase_number}_heuristic_severity_t{product.time_index:03d}"
     markdown_path = output_path / f"{base_name}.md"
     json_path = output_path / f"{base_name}.json"
     netcdf_path = output_path / f"{base_name}.nc"
@@ -626,9 +655,26 @@ def write_phase4_outputs(
         "png": png_path,
     }
 
-    _build_output_dataset(product).to_netcdf(netcdf_path)
-    _render_severity_figure(product, png_path)
-    markdown_path.write_text(product.to_markdown(output_paths), encoding="utf-8")
-    json_path.write_text(json.dumps(product.to_dict(output_paths), indent=2, ensure_ascii=False), encoding="utf-8")
+    _build_output_dataset(product, phase_number=phase_number).to_netcdf(netcdf_path)
+    _render_severity_figure(product, png_path, phase_number=phase_number)
+    markdown_path.write_text(product.to_markdown(output_paths, phase_number=phase_number), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(product.to_dict(output_paths, phase_number=phase_number), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     return markdown_path, json_path, netcdf_path, png_path
+
+
+def write_phase4_outputs(
+    product: Phase4HeuristicSeverityProduct,
+    output_dir: str | Path,
+) -> tuple[Path, Path, Path, Path]:
+    return _write_heuristic_severity_outputs(product, output_dir, phase_number=4)
+
+
+def write_phase6_outputs(
+    product: Phase6HeuristicSeverityProduct,
+    output_dir: str | Path,
+) -> tuple[Path, Path, Path, Path]:
+    return _write_heuristic_severity_outputs(product, output_dir, phase_number=6)

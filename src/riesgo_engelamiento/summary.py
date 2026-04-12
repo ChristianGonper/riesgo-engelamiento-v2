@@ -183,17 +183,17 @@ def _build_diagnostics(dataset: xr.Dataset, validation: ValidationReport) -> tup
     if severity_missing:
         diagnostics.append(
             DiagnosticStatus(
-                name="Heuristic severity",
+                name="Phase 6 heuristic severity",
                 status="unsupported",
-                reason=f"missing required inputs for the heuristic layer: {', '.join(severity_missing)}.",
+                reason=f"missing required inputs for the phase-6 heuristic layer: {', '.join(severity_missing)}.",
             )
         )
     else:
         diagnostics.append(
             DiagnosticStatus(
-                name="Heuristic severity",
+                name="Phase 6 heuristic severity",
                 status="available with caveats",
-                reason="severity is available as a documented heuristic built on the approximate risk product and relative model levels.",
+                reason="severity is available as a documented phase-6 heuristic built on the approximate risk product and relative model levels.",
             )
         )
     return tuple(diagnostics)
