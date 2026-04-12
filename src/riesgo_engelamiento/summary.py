@@ -62,7 +62,7 @@ class Phase1Summary:
             f"- Vertical levels: {self.vertical_levels}",
             f"- Staggered vertical levels: {self.vertical_staggered_levels}",
             "",
-            "## Supported diagnostics",
+            "## Diagnostic status",
         ]
         for diagnostic in self.diagnostics:
             lines.append(f"- {diagnostic.name}: {diagnostic.status} ({diagnostic.reason})")
@@ -113,30 +113,56 @@ def _infer_time_step_minutes(time_values: np.ndarray) -> int | None:
     return None
 
 
-def _build_diagnostics(dataset: xr.Dataset) -> tuple[DiagnosticStatus, ...]:
+def _build_diagnostics(dataset: xr.Dataset, validation: ValidationReport) -> tuple[DiagnosticStatus, ...]:
+    missing_variables = set(validation.missing_variables)
+    missing_dimensions = set(validation.missing_dimensions)
+
+    def _status_for(required_variables: set[str], required_dimensions: set[str] = set()) -> tuple[str, str]:
+        absent_variables = sorted(required_variables & missing_variables)
+        absent_dimensions = sorted(required_dimensions & missing_dimensions)
+        if absent_variables or absent_dimensions:
+            parts: list[str] = []
+            if absent_variables:
+                parts.append(f"missing variables: {', '.join(absent_variables)}")
+            if absent_dimensions:
+                parts.append(f"missing dimensions: {', '.join(absent_dimensions)}")
+            return "unsupported", "; ".join(parts)
+        return "supported", "all required inputs are present."
+
     diagnostics: list[DiagnosticStatus] = []
+    liquid_status, liquid_reason = _status_for({"QCLOUD", "QRAIN"})
     diagnostics.append(
         DiagnosticStatus(
             name="Liquid-water presence",
-            status="supported",
-            reason="QCLOUD and QRAIN are present in the dataset.",
+            status=liquid_status,
+            reason=liquid_reason,
         )
     )
+    vertical_status, vertical_reason = _status_for({"ZNW"}, {"bottom_top", "bottom_top_stag"})
     diagnostics.append(
         DiagnosticStatus(
             name="Vertical structure",
-            status="supported",
-            reason="bottom_top and ZNW dimensions are available for model-level analysis.",
+            status=vertical_status,
+            reason=vertical_reason,
         )
     )
+    mixed_status, mixed_reason = _status_for({"QICE"})
     diagnostics.append(
         DiagnosticStatus(
             name="Mixed-phase context",
-            status="supported",
-            reason="QICE is present as a contextual ice field.",
+            status=mixed_status,
+            reason=mixed_reason,
         )
     )
-    if "PB" in dataset:
+    if {"T", "P", "ZNW"} & missing_variables:
+        diagnostics.append(
+            DiagnosticStatus(
+                name="Approximate icing risk",
+                status="unsupported",
+                reason="missing required inputs for the future approximate path: T, P and ZNW must all be present.",
+            )
+        )
+    elif "PB" in dataset:
         diagnostics.append(
             DiagnosticStatus(
                 name="Approximate icing risk",
@@ -182,7 +208,7 @@ def build_phase1_summary(dataset: xr.Dataset, validation: ValidationReport, data
         validation=validation,
         assumptions=ASSUMPTIONS,
         limitations=LIMITATIONS,
-        diagnostics=_build_diagnostics(dataset),
+        diagnostics=_build_diagnostics(dataset, validation),
     )
 
 

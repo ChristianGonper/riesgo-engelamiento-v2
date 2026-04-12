@@ -103,3 +103,16 @@ def test_main_writes_artifacts_even_when_validation_fails(tmp_path: Path, monkey
     assert json_path.exists()
     assert "invalid" in markdown_path.read_text(encoding="utf-8")
 
+
+def test_invalid_summary_does_not_claim_missing_diagnostics_are_supported() -> None:
+    dataset = _build_dataset(include_qrain=False, include_bottom_top_stag=False)
+    report = validate_dataset(dataset, source="synthetic.nc")
+    summary = build_phase1_summary(dataset, report, "synthetic.nc")
+
+    diagnostics = {diagnostic.name: diagnostic for diagnostic in summary.diagnostics}
+    assert diagnostics["Liquid-water presence"].status == "unsupported"
+    assert "QRAIN" in diagnostics["Liquid-water presence"].reason
+    assert diagnostics["Vertical structure"].status == "unsupported"
+    assert "bottom_top_stag" in report.missing_dimensions
+    assert diagnostics["Approximate icing risk"].status == "unsupported"
+    assert "ZNW" in diagnostics["Approximate icing risk"].reason
