@@ -5,6 +5,8 @@ from typing import Any, Sequence
 
 import matplotlib
 import numpy as np
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 from matplotlib.colors import Normalize
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
@@ -33,6 +35,10 @@ class FinalProductMapStyle:
     legend_facecolor: str = "#ffffff"
     legend_edgecolor: str = "#cbd5e1"
     footer_color: str = "#475569"
+    land_facecolor: str = "#f8fafc"
+    ocean_facecolor: str = "#e2e8f0"
+    coastline_color: str = "#334155"
+    border_color: str = "#0f172a"
     info_box_alpha: float = 0.96
 
     def annotation_box(self) -> dict[str, Any]:
@@ -53,11 +59,56 @@ def create_final_product_canvas(
 ) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
     fig = plt.figure(figsize=style.figure_size, dpi=style.dpi, facecolor=style.figure_facecolor, constrained_layout=True)
     grid = fig.add_gridspec(1, 2, width_ratios=[3.4, 1.25])
-    map_ax = fig.add_subplot(grid[0, 0])
+    map_ax = fig.add_subplot(grid[0, 0], projection=ccrs.PlateCarree())
     annotation_ax = fig.add_subplot(grid[0, 1])
     map_ax.set_facecolor(style.map_facecolor)
     annotation_ax.set_facecolor(style.figure_facecolor)
     return fig, map_ax, annotation_ax
+
+
+def _domain_extent(lon: np.ndarray, lat: np.ndarray, *, padding_fraction: float = 0.14, minimum_padding: float = 1.5) -> tuple[float, float, float, float]:
+    lon_values = np.asarray(lon, dtype=np.float64)
+    lat_values = np.asarray(lat, dtype=np.float64)
+    lon_min = float(np.nanmin(lon_values))
+    lon_max = float(np.nanmax(lon_values))
+    lat_min = float(np.nanmin(lat_values))
+    lat_max = float(np.nanmax(lat_values))
+
+    lon_span = max(lon_max - lon_min, 0.5)
+    lat_span = max(lat_max - lat_min, 0.5)
+    lon_pad = max(lon_span * padding_fraction, minimum_padding)
+    lat_pad = max(lat_span * padding_fraction, minimum_padding)
+    return (
+        lon_min - lon_pad,
+        lon_max + lon_pad,
+        lat_min - lat_pad,
+        lat_max + lat_pad,
+    )
+
+
+def _add_geographic_context(
+    ax: plt.Axes,
+    *,
+    lon: np.ndarray,
+    lat: np.ndarray,
+    style: FinalProductMapStyle = DEFAULT_FINAL_PRODUCT_MAP_STYLE,
+) -> None:
+    extent = _domain_extent(lon, lat)
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND.with_scale("110m"), facecolor=style.land_facecolor, edgecolor="none", zorder=0)
+    ax.add_feature(cfeature.OCEAN.with_scale("110m"), facecolor=style.ocean_facecolor, edgecolor="none", zorder=0)
+    ax.add_feature(cfeature.COASTLINE.with_scale("110m"), edgecolor=style.coastline_color, linewidth=1.0, zorder=3)
+    ax.add_feature(cfeature.BORDERS.with_scale("110m"), edgecolor=style.border_color, linewidth=1.1, zorder=3)
+    gridlines = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=False,
+        linewidth=0.6,
+        color=style.grid_color,
+        alpha=0.28,
+        linestyle="--",
+    )
+    gridlines.xlocator = MaxNLocator(nbins=5)
+    gridlines.ylocator = MaxNLocator(nbins=5)
 
 
 def render_binary_geographic_map(
@@ -75,9 +126,29 @@ def render_binary_geographic_map(
     binary_field = np.asarray(field, dtype=np.uint8)
     cmap = ListedColormap([style.absent_color, style.present_color])
     if lon is not None and lat is not None:
-        mesh = ax.pcolormesh(lon, lat, binary_field, shading="auto", cmap=cmap, vmin=0, vmax=1)
+        _add_geographic_context(ax, lon=lon, lat=lat, style=style)
+        mesh = ax.pcolormesh(
+            lon,
+            lat,
+            binary_field,
+            shading="auto",
+            cmap=cmap,
+            vmin=0,
+            vmax=1,
+            transform=ccrs.PlateCarree(),
+            zorder=1,
+        )
         if np.any(binary_field > 0):
-            ax.contour(lon, lat, binary_field, levels=[0.5], colors=style.present_edge_color, linewidths=1.25)
+            ax.contour(
+                lon,
+                lat,
+                binary_field,
+                levels=[0.5],
+                colors=style.present_edge_color,
+                linewidths=1.25,
+                transform=ccrs.PlateCarree(),
+                zorder=2,
+            )
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
@@ -138,7 +209,17 @@ def render_scalar_geographic_map(
     scalar_field = np.asarray(field, dtype=np.float32)
     norm = Normalize(vmin=vmin, vmax=vmax)
     if lon is not None and lat is not None:
-        mesh = ax.pcolormesh(lon, lat, scalar_field, shading="auto", cmap=cmap, norm=norm)
+        _add_geographic_context(ax, lon=lon, lat=lat, style=style)
+        mesh = ax.pcolormesh(
+            lon,
+            lat,
+            scalar_field,
+            shading="auto",
+            cmap=cmap,
+            norm=norm,
+            transform=ccrs.PlateCarree(),
+            zorder=1,
+        )
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
@@ -146,7 +227,17 @@ def render_scalar_geographic_map(
         if contour_levels:
             levels = [level for level in contour_levels if vmin < level < vmax]
             if levels:
-                ax.contour(lon, lat, scalar_field, levels=levels, colors=style.present_edge_color, linewidths=0.95, alpha=0.5)
+                ax.contour(
+                    lon,
+                    lat,
+                    scalar_field,
+                    levels=levels,
+                    colors=style.present_edge_color,
+                    linewidths=0.95,
+                    alpha=0.5,
+                    transform=ccrs.PlateCarree(),
+                    zorder=2,
+                )
     else:
         mesh = ax.imshow(scalar_field, origin="lower", cmap=cmap, norm=norm)
         ax.set_xlabel("west_east")

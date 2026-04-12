@@ -5,6 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import cartopy.crs as ccrs
 import xarray as xr
 
 from riesgo_engelamiento import cli
@@ -98,6 +99,7 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert payload["source_phase"] == 5
     assert payload["map_field_kind"] == "Phase 5 approximate-risk footprint"
     assert payload["map_semantics"] == "binary approximate-risk footprint rendered directly from Phase 5"
+    assert "Cartopy PlateCarree map" in payload["map_geographic_context"]
     assert payload["selected_time_index"] == 0
     assert payload["selected_time_label"] == "2015-04-17T18:00:00"
     assert "selected_time_index" in payload["contract"]["required_metadata_fields"]
@@ -133,6 +135,14 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
     try:
         assert len(figure.axes) == 3
         map_axis, annotation_axis, colorbar_axis = figure.axes
+        assert type(map_axis.projection).__name__ == "PlateCarree"
+        feature_artists = [collection for collection in map_axis.collections if collection.__class__.__module__.startswith("cartopy.mpl.feature_artist")]
+        assert len(feature_artists) >= 3
+        extent = map_axis.get_extent(crs=ccrs.PlateCarree())
+        assert extent[0] < extent[1]
+        assert extent[2] < extent[3]
+        assert extent[0] < -3.0 < extent[1]
+        assert extent[2] < 40.0 < extent[3]
         annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
         assert "Final product annotations" in annotation_text
         assert "heuristic-severity" in annotation_text
@@ -200,12 +210,14 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert "Render view: `heuristic-severity`" in final_markdown_text
     assert "Source phase: Phase 6" in final_markdown_text
     assert "phase6_markdown" in final_markdown_text
+    assert "Cartopy PlateCarree map" in final_markdown_text
     assert "png" in final_markdown_text
     assert final_payload["render_view"] == "heuristic-severity"
     assert final_payload["source_mode"] == "heuristic-severity"
     assert final_payload["source_phase"] == 6
     assert final_payload["map_field_kind"] == "Spatial heuristic severity score"
     assert "2D heuristic severity score" in final_payload["map_semantics"]
+    assert "Cartopy PlateCarree map" in final_payload["map_geographic_context"]
     assert final_payload["selected_time_index"] == 0
     assert final_payload["selected_time_label"] == "2015-04-17T18:00:00"
     assert final_payload["source_metrics"]["severity_class"] == "moderate"

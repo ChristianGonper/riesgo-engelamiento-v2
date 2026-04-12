@@ -12,6 +12,7 @@ dependencies = [
   "xarray>=2025.1.0",
   "netCDF4>=1.7.2",
   "matplotlib>=3.10.0",
+  "cartopy>=0.25.0",
 ]
 
 [project.optional-dependencies]

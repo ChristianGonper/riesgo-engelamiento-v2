@@ -57,6 +57,7 @@ class FinalProductSummary:
     source_product_kind: str
     map_field_kind: str
     map_semantics: str
+    map_geographic_context: str = "Cartopy PlateCarree map with Natural Earth coastlines, borders, land and ocean context"
     output_purpose: str = FINAL_PRODUCT_OUTPUT_PURPOSE
     contract: FinalProductArtifactContract = field(default_factory=FinalProductArtifactContract)
     caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
@@ -77,6 +78,7 @@ class FinalProductSummary:
             "source_product_kind": self.source_product_kind,
             "map_field_kind": self.map_field_kind,
             "map_semantics": self.map_semantics,
+            "map_geographic_context": self.map_geographic_context,
             "caveat_labels": list(self.caveat_labels),
             "contract": self.contract.to_dict(),
             "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
@@ -109,6 +111,7 @@ class FinalProductSummary:
             f"- Source product kind: {self.source_product_kind}",
             f"- Map field kind: {self.map_field_kind}",
             f"- Map semantics: {self.map_semantics}",
+            f"- Map geographic context: {self.map_geographic_context}",
             f"- Dataset: `{self.dataset_path}`",
             f"- selected_time_index: {self.time_index}",
             f"- selected_time_label: {self.time_label or 'unknown'}",
@@ -244,6 +247,7 @@ def _final_product_annotation_lines(
     risk_metrics = summary.source_metrics if summary.render_view == "approximate-risk" else _risk_source_metrics(risk_product)
     lines.append(f"Approximate-risk coverage: {risk_metrics['risk_horizontal_fraction']:.1%}")
     lines.append(f"Liquid coverage: {risk_metrics['liquid_horizontal_fraction']:.1%}")
+    lines.append(f"Geographic context: {summary.map_geographic_context}")
 
     lon = risk_product.risk_presence.coords.get("XLONG")
     lat = risk_product.risk_presence.coords.get("XLAT")
@@ -392,6 +396,7 @@ def build_final_product_summary(
             source_product_kind="approximate proxy",
             map_field_kind="Phase 5 approximate-risk footprint",
             map_semantics="binary approximate-risk footprint rendered directly from Phase 5",
+            map_geographic_context="Cartopy PlateCarree map with Natural Earth borders and coastlines framing the selected WRF domain",
             source_artifacts=source_artifacts_map,
             source_metrics=_risk_source_metrics(source_product),
         )
@@ -413,6 +418,7 @@ def build_final_product_summary(
                 "2D heuristic severity score per cell derived from Phase 5 risk/liquid overlap, "
                 "mixed-phase presence, and coherence at the selected time"
             ),
+            map_geographic_context="Cartopy PlateCarree map with Natural Earth borders and coastlines framing the selected WRF domain",
             source_artifacts=source_artifacts_map,
             source_metrics=_severity_source_metrics(source_product),
         )
