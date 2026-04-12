@@ -106,9 +106,11 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "selected_time_label" in payload["contract"]["required_metadata_fields"]
     assert "map_field_kind" in payload["contract"]["required_metadata_fields"]
     assert "map_semantics" in payload["contract"]["required_metadata_fields"]
+    assert "map_geographic_context" in payload["contract"]["required_metadata_fields"]
     assert "outputs" in payload["contract"]["required_metadata_fields"]
     assert payload["contract"]["supported_views"] == ["approximate-risk", "heuristic-severity"]
     assert payload["source_metrics"]["has_risk"] is True
+    assert "map_geographic_context" in payload
 
 
 def test_final_product_figure_contains_self_contained_annotations() -> None:
@@ -218,6 +220,7 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["map_field_kind"] == "Spatial heuristic severity score"
     assert "2D heuristic severity score" in final_payload["map_semantics"]
     assert "Cartopy PlateCarree map" in final_payload["map_geographic_context"]
+    assert "map_geographic_context" in final_payload["contract"]["required_metadata_fields"]
     assert final_payload["selected_time_index"] == 0
     assert final_payload["selected_time_label"] == "2015-04-17T18:00:00"
     assert final_payload["source_metrics"]["severity_class"] == "moderate"

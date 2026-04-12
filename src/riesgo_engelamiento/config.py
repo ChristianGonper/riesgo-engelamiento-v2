@@ -24,6 +24,7 @@ FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
     "source_phase",
     "map_field_kind",
     "map_semantics",
+    "map_geographic_context",
     "selected_time_index",
     "selected_time_label",
     "caveat_labels",
