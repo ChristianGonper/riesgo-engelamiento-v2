@@ -64,10 +64,13 @@ def _build_final_product_dataset() -> xr.Dataset:
 def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> None:
     dataset = _build_final_product_dataset()
     phase5_product = build_phase5_approximate_risk_product(dataset, "synthetic.nc", time_index=0)
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=0)
     summary = build_final_product_summary(
         phase5_product,
         "synthetic.nc",
         render_view="approximate-risk",
+        selected_band="upper",
+        severity_product=phase6_product,
         source_artifacts={
             "phase5_markdown": Path("phase5.md"),
             "phase5_json": Path("phase5.json"),
@@ -85,6 +88,9 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert markdown_path.exists()
     assert json_path.exists()
     assert png_path.exists()
+    assert "_band_upper" in markdown_path.name
+    assert "_band_upper" in json_path.name
+    assert "_band_upper" in png_path.name
 
     markdown_text = markdown_path.read_text(encoding="utf-8")
     payload = json.loads(json_path.read_text(encoding="utf-8"))
@@ -92,24 +98,46 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "Artifact contract: `presentation/final-product`" in markdown_text
     assert "Render view: `approximate-risk`" in markdown_text
     assert "Source phase: Phase 5" in markdown_text
+    assert "Selected band request: upper" in markdown_text
+    assert "Selected band: upper" in markdown_text
+    assert "Selected band resolution: explicit" in markdown_text
+    assert "Band relation: selected band upper differs from dominant band lower" in markdown_text
     assert "phase5_markdown" in markdown_text
     assert payload["artifact_kind"] == "presentation/final-product"
     assert payload["source_mode"] == "approximate-risk"
     assert payload["render_view"] == "approximate-risk"
     assert payload["source_phase"] == 5
-    assert payload["map_field_kind"] == "Phase 5 approximate-risk footprint"
-    assert payload["map_semantics"] == "binary approximate-risk footprint rendered directly from Phase 5"
+    assert payload["map_field_kind"] == "Phase 5 approximate-risk footprint (upper band)"
+    assert payload["map_semantics"] == "binary approximate-risk footprint rendered directly from Phase 5 and conditioned on the selected upper model-relative band"
     assert "Cartopy PlateCarree map" in payload["map_geographic_context"]
     assert payload["selected_time_index"] == 0
     assert payload["selected_time_label"] == "2015-04-17T18:00:00"
+    assert payload["selected_band_request"] == "upper"
+    assert payload["selected_band"] == "upper"
+    assert payload["selected_band_resolution"] == "explicit"
+    assert payload["selected_band_eta_range"] == [0.66, 1.0]
+    assert payload["selected_band_level_count"] == 1
+    assert payload["selected_band_meaning"] == "Upper relative eta band of the model-level stack"
+    assert payload["selected_band_signal_status"] == "empty"
+    assert payload["dominant_band"] == "lower"
+    assert payload["dominant_band_eta_range"] == [0.0, 0.33]
+    assert payload["dominant_band_level_count"] == 1
+    assert payload["dominant_band_meaning"] == "Lower relative eta band of the model-level stack"
+    assert payload["band_relation"] == "selected band upper differs from dominant band lower"
     assert "selected_time_index" in payload["contract"]["required_metadata_fields"]
     assert "selected_time_label" in payload["contract"]["required_metadata_fields"]
+    assert "selected_band_request" in payload["contract"]["required_metadata_fields"]
+    assert "selected_band" in payload["contract"]["required_metadata_fields"]
+    assert "selected_band_resolution" in payload["contract"]["required_metadata_fields"]
+    assert "dominant_band" in payload["contract"]["required_metadata_fields"]
+    assert "band_relation" in payload["contract"]["required_metadata_fields"]
     assert "map_field_kind" in payload["contract"]["required_metadata_fields"]
     assert "map_semantics" in payload["contract"]["required_metadata_fields"]
     assert "map_geographic_context" in payload["contract"]["required_metadata_fields"]
     assert "outputs" in payload["contract"]["required_metadata_fields"]
     assert payload["contract"]["supported_views"] == ["approximate-risk", "heuristic-severity"]
     assert payload["source_metrics"]["has_risk"] is True
+    assert payload["source_metrics"]["selected_band_signal_status"] == "empty"
     assert "map_geographic_context" in payload
 
 
@@ -121,6 +149,8 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         phase6_product,
         "synthetic.nc",
         render_view="heuristic-severity",
+        selected_band="dominant",
+        severity_product=phase6_product,
         source_artifacts={
             "phase5_markdown": Path("phase5.md"),
             "phase5_json": Path("phase5.json"),
@@ -148,14 +178,16 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
         assert "Final product annotations" in annotation_text
         assert "heuristic-severity" in annotation_text
+        assert "Selected band: lower" in annotation_text
+        assert "Selected band resolution: dominant" in annotation_text
         assert "Severity class" in annotation_text
-        assert "Dominant band" in annotation_text
-        assert "Spatial score range" in annotation_text
-        assert "Spatial score formula" in annotation_text
+        assert "Dominant band (phase 6): lower" in annotation_text
+        assert "Band score range" in annotation_text
+        assert "Band score formula" in annotation_text
         assert "Caveats" in annotation_text
         assert map_axis.get_legend() is None
-        assert "spatial heuristic severity score" in map_axis.get_title(loc="left")
-        assert colorbar_axis.get_ylabel() == "Spatial heuristic severity score (0-100)"
+        assert "band-conditioned spatial heuristic severity score" in map_axis.get_title(loc="left")
+        assert colorbar_axis.get_ylabel() == "Band-conditioned heuristic severity score (0-100)"
     finally:
         plt.close(figure)
 
@@ -187,6 +219,8 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
             "--time-index",
             "0",
             "--final-product",
+            "--final-product-band",
+            "upper",
         ]
     )
 
@@ -201,6 +235,9 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert len(final_markdown) == 1
     assert len(final_json) == 1
     assert len(final_png) == 1
+    assert "_band_upper" in final_markdown[0].name
+    assert "_band_upper" in final_json[0].name
+    assert "_band_upper" in final_png[0].name
     assert len(phase2_markdown) == 1
     assert len(phase5_markdown) == 1
     assert len(phase6_markdown) == 1
@@ -211,15 +248,23 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert "Artifact contract: `presentation/final-product`" in final_markdown_text
     assert "Render view: `heuristic-severity`" in final_markdown_text
     assert "Source phase: Phase 6" in final_markdown_text
+    assert "Selected band request: upper" in final_markdown_text
+    assert "Selected band: upper" in final_markdown_text
+    assert "Selected band signal status: empty" in final_markdown_text
     assert "phase6_markdown" in final_markdown_text
     assert "Cartopy PlateCarree map" in final_markdown_text
     assert "png" in final_markdown_text
     assert final_payload["render_view"] == "heuristic-severity"
     assert final_payload["source_mode"] == "heuristic-severity"
     assert final_payload["source_phase"] == 6
-    assert final_payload["map_field_kind"] == "Spatial heuristic severity score"
-    assert "2D heuristic severity score" in final_payload["map_semantics"]
+    assert final_payload["map_field_kind"] == "Spatial heuristic severity score (upper band)"
+    assert "band-conditioned" in final_payload["map_semantics"]
     assert "Cartopy PlateCarree map" in final_payload["map_geographic_context"]
+    assert final_payload["selected_band_request"] == "upper"
+    assert final_payload["selected_band"] == "upper"
+    assert final_payload["selected_band_resolution"] == "explicit"
+    assert final_payload["selected_band_signal_status"] == "empty"
+    assert final_payload["dominant_band"] == "lower"
     assert "map_geographic_context" in final_payload["contract"]["required_metadata_fields"]
     assert final_payload["selected_time_index"] == 0
     assert final_payload["selected_time_label"] == "2015-04-17T18:00:00"

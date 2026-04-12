@@ -14,6 +14,7 @@ FINAL_PRODUCT_RENDER_VIEWS = (
 FINAL_PRODUCT_CAVEAT_LABELS = (
     "selected-time presentation wrapper over diagnostic phases",
     "diagnostic source remains a proxy, not an operational forecast",
+    "vertical bands are model-relative eta groups, not exact altitude bins",
     "geometric altitude is still out of scope for this project slice",
 )
 FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
@@ -27,11 +28,34 @@ FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
     "map_geographic_context",
     "selected_time_index",
     "selected_time_label",
+    "selected_band_request",
+    "selected_band",
+    "selected_band_resolution",
+    "selected_band_eta_range",
+    "selected_band_level_count",
+    "selected_band_meaning",
+    "selected_band_signal_status",
+    "dominant_band",
+    "dominant_band_eta_range",
+    "dominant_band_level_count",
+    "dominant_band_meaning",
+    "band_relation",
     "caveat_labels",
     "source_artifacts",
     "source_metrics",
     "outputs",
 )
+FINAL_PRODUCT_VERTICAL_BAND_CHOICES = (
+    "dominant",
+    "upper",
+    "middle",
+    "lower",
+)
+FINAL_PRODUCT_VERTICAL_BAND_MEANINGS = {
+    "upper": "Upper relative eta band of the model-level stack",
+    "middle": "Middle relative eta band of the model-level stack",
+    "lower": "Lower relative eta band of the model-level stack",
+}
 APPROXIMATE_PRESSURE_TOP_PA = 5000.0
 APPROXIMATE_PRESSURE_SURFACE_PA = 100000.0
 APPROXIMATE_POISSON_KAPPA = 0.286

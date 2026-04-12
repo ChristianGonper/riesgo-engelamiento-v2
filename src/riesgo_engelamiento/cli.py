@@ -4,7 +4,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from .config import DEFAULT_DATASET_NAME, DEFAULT_OUTPUT_DIR_NAME, FINAL_PRODUCT_RENDER_VIEWS
+from .config import (
+    DEFAULT_DATASET_NAME,
+    DEFAULT_OUTPUT_DIR_NAME,
+    FINAL_PRODUCT_RENDER_VIEWS,
+    FINAL_PRODUCT_VERTICAL_BAND_CHOICES,
+)
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
 from .final_product import build_final_product_summary, write_final_product_outputs
 from .phase2 import build_phase2_liquid_product, write_phase2_outputs
@@ -55,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=FINAL_PRODUCT_RENDER_VIEWS,
         default="heuristic-severity",
         help="Vista diagnostica usada para el artefacto final de presentacion.",
+    )
+    parser.add_argument(
+        "--final-product-band",
+        choices=FINAL_PRODUCT_VERTICAL_BAND_CHOICES,
+        default="dominant",
+        help="Banda vertical relativa usada en el artefacto final; 'dominant' usa la banda dominante del tiempo seleccionado.",
     )
     return parser
 
@@ -107,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
                         phase5_product,
                         args.dataset,
                         render_view=args.final_product_view,
+                        selected_band=args.final_product_band,
+                        severity_product=phase6_product,
                         source_artifacts={
                             "phase5_markdown": phase5_markdown_path,
                             "phase5_json": phase5_json_path,
@@ -123,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
                         phase6_product,
                         args.dataset,
                         render_view=args.final_product_view,
+                        selected_band=args.final_product_band,
+                        severity_product=phase6_product,
                         source_artifacts={
                             "phase6_markdown": phase6_markdown_path,
                             "phase6_json": phase6_json_path,
