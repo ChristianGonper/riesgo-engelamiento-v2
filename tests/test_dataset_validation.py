@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
 
+from riesgo_engelamiento import cli
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
 from riesgo_engelamiento.dataset import DatasetValidationError, assert_valid, validate_dataset
 from riesgo_engelamiento.summary import build_phase1_summary
@@ -57,6 +60,7 @@ def test_validate_dataset_accepts_complete_dataset() -> None:
     assert summary.horizontal_shape == (4, 5)
     assert summary.vertical_levels == 3
     assert summary.vertical_staggered_levels == 4
+    assert "available with caveats" in summary.to_markdown()
     assert "T0 = 300 K" in summary.to_markdown()
 
 
@@ -70,4 +74,32 @@ def test_validate_dataset_reports_missing_inputs_and_raises_on_request() -> None
 
     with pytest.raises(DatasetValidationError):
         assert_valid(report)
+
+
+def test_main_writes_artifacts_even_when_validation_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dataset = _build_dataset(include_qrain=False, include_bottom_top_stag=False)
+    dataset_file = tmp_path / "dummy.nc"
+    dataset_file.write_text("placeholder", encoding="utf-8")
+    output_dir = tmp_path / "outputs"
+
+    class _DatasetContext:
+        def __init__(self, wrapped: xr.Dataset) -> None:
+            self._wrapped = wrapped
+
+        def __enter__(self) -> xr.Dataset:
+            return self._wrapped
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    monkeypatch.setattr(cli, "open_dataset", lambda path: _DatasetContext(dataset))
+
+    exit_code = cli.main(["--dataset", str(dataset_file), "--output-dir", str(output_dir)])
+
+    assert exit_code == 1
+    markdown_path = output_dir / "phase1_summary.md"
+    json_path = output_dir / "phase1_summary.json"
+    assert markdown_path.exists()
+    assert json_path.exists()
+    assert "invalid" in markdown_path.read_text(encoding="utf-8")
 

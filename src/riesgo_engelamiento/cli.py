@@ -46,16 +46,18 @@ def main(argv: list[str] | None = None) -> int:
 
     with open_dataset(args.dataset) as dataset:
         validation = validate_dataset(dataset, source=args.dataset)
+        summary = build_phase1_summary(dataset, validation, args.dataset)
+        markdown_path, json_path = write_phase1_outputs(summary, args.output_dir)
+
         if not validation.is_valid:
-            print(validation.to_markdown())
+            print(validation.to_markdown(), file=sys.stderr)
             try:
                 assert_valid(validation)
             except DatasetValidationError as exc:
                 print(str(exc), file=sys.stderr)
+                print(f"Validation artifacts written to: {markdown_path}", file=sys.stderr)
+                print(f"Validation artifacts written to: {json_path}", file=sys.stderr)
                 return 1
-
-        summary = build_phase1_summary(dataset, validation, args.dataset)
-        markdown_path, json_path = write_phase1_outputs(summary, args.output_dir)
 
     print()
     print(summary.to_markdown())

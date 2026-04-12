@@ -148,8 +148,8 @@ def _build_diagnostics(dataset: xr.Dataset) -> tuple[DiagnosticStatus, ...]:
         diagnostics.append(
             DiagnosticStatus(
                 name="Approximate icing risk",
-                status="deferred",
-                reason="PB is absent, so only a future approximate proxy is possible.",
+                status="available with caveats",
+                reason="PB is absent, so the risk product remains approximate and must use T + 300, P and ZNW as a proxy path.",
             )
         )
     return tuple(diagnostics)
