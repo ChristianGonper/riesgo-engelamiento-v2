@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .config import DEFAULT_DATASET_NAME, DEFAULT_OUTPUT_DIR_NAME
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
+from .phase2 import build_phase2_liquid_product, write_phase2_outputs
 from .summary import build_phase1_summary, write_phase1_outputs
 
 
@@ -35,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=_default_output_dir(),
         help="Directorio donde se escriben los resúmenes de fase 1.",
     )
+    parser.add_argument(
+        "--time-index",
+        type=int,
+        default=0,
+        help="Indice de tiempo a usar para la fase 2.",
+    )
     return parser
 
 
@@ -59,9 +66,33 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Validation artifacts written to: {json_path}", file=sys.stderr)
                 return 1
 
+        try:
+            phase2_product = build_phase2_liquid_product(dataset, args.dataset, time_index=args.time_index)
+            phase2_markdown_path, phase2_json_path, phase2_netcdf_path, phase2_png_path = write_phase2_outputs(
+                phase2_product,
+                args.output_dir,
+            )
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
     print()
     print(summary.to_markdown())
     print()
     print(f"Markdown summary written to: {markdown_path}")
     print(f"JSON summary written to: {json_path}")
+    print()
+    print(phase2_product.to_markdown(
+        {
+            "markdown": phase2_markdown_path,
+            "json": phase2_json_path,
+            "netcdf": phase2_netcdf_path,
+            "png": phase2_png_path,
+        }
+    ))
+    print()
+    print(f"Markdown summary written to: {phase2_markdown_path}")
+    print(f"JSON summary written to: {phase2_json_path}")
+    print(f"NetCDF mask written to: {phase2_netcdf_path}")
+    print(f"PNG mask written to: {phase2_png_path}")
     return 0
