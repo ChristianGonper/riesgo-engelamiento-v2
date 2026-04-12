@@ -21,6 +21,12 @@ Pipeline reproducible en Python para validar una salida WRF, documentar sus limi
 - `src/riesgo_engelamiento/phase4.py`: severidad heurística y rangos relativos de niveles.
 - `src/riesgo_engelamiento/cli.py`: entrada principal reproducible.
 
+## Project Docs
+- PRD: `specs/PRD_riesgo_engelamiento.md`
+- Plan: `plans/plan_riesgo_engelamiento.md`
+- Session handoff: `docs/session_2026-04-12_handoff.md`
+- ADRs: `docs/decisions/`
+
 ## Notes
 - La constante base de temperatura potencial usada en esta primera fase es `T0 = 300 K`.
 - La salida de fase 1 es deliberadamente descriptiva: valida entradas, expone supuestos y deja marcadas las limitaciones del archivo.
