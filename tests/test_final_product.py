@@ -13,7 +13,9 @@ from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
 from riesgo_engelamiento.final_product import (
     build_final_product_figure,
     build_final_product_summary,
+    build_highlighted_times_summary,
     write_final_product_outputs,
+    write_highlighted_times_outputs,
 )
 from riesgo_engelamiento.phase5 import build_phase5_approximate_risk_product
 from riesgo_engelamiento.phase6 import build_phase6_heuristic_severity_product
@@ -59,6 +61,98 @@ def _build_final_product_dataset() -> xr.Dataset:
         coords={"XTIME": (EXPECTED_DIMS_BY_VARIABLE["XTIME"], time)},
         attrs={"TITLE": "synthetic wrfout", "START_DATE": "2015-04-17_18:00:00"},
     )
+
+
+def _build_highlighted_times_dataset() -> xr.Dataset:
+    time = np.array(
+        [
+            "2015-04-17T18:00:00",
+            "2015-04-17T19:00:00",
+            "2015-04-17T20:00:00",
+            "2015-04-17T21:00:00",
+        ],
+        dtype="datetime64[ns]",
+    )
+    bottom_top = 3
+    south_north = 2
+    west_east = 2
+    bottom_top_stag = bottom_top + 1
+
+    qcloud = np.zeros((time.size, bottom_top, south_north, west_east), dtype=np.float32)
+    qrain = np.zeros_like(qcloud)
+    qice = np.zeros_like(qcloud)
+    theta = np.zeros_like(qcloud)
+    pressure = np.zeros_like(qcloud)
+    vertical = np.tile(np.array([1.0, 0.66, 0.33, 0.0], dtype=np.float32), (time.size, 1))
+    horizontal = np.zeros((time.size, south_north, west_east), dtype=np.float32)
+
+    qcloud[0, 0, 0, 0] = 1.0
+    qrain[0, 0, 0, 0] = 1.0
+    qice[0, 0, 0, 0] = 1.0
+
+    qcloud[1, 0:2, :, :] = 1.0
+    qrain[1, 0:2, :, :] = 1.0
+    qice[1, 0:2, :, :] = 1.0
+
+    qcloud[2, :, :, :] = 1.0
+    qrain[2, :, :, :] = 1.0
+    qice[2, :, :, :] = 1.0
+
+    qcloud[3, 0, :, :] = 1.0
+    qrain[3, 0, :, :] = 1.0
+    qice[3, 0, :, :] = 1.0
+
+    return xr.Dataset(
+        data_vars={
+            "QCLOUD": (EXPECTED_DIMS_BY_VARIABLE["QCLOUD"], qcloud),
+            "QRAIN": (EXPECTED_DIMS_BY_VARIABLE["QRAIN"], qrain),
+            "QICE": (EXPECTED_DIMS_BY_VARIABLE["QICE"], qice),
+            "T": (EXPECTED_DIMS_BY_VARIABLE["T"], theta),
+            "P": (EXPECTED_DIMS_BY_VARIABLE["P"], pressure),
+            "ZNW": (EXPECTED_DIMS_BY_VARIABLE["ZNW"], vertical),
+            "XLAT": (EXPECTED_DIMS_BY_VARIABLE["XLAT"], horizontal + 40.0),
+            "XLONG": (EXPECTED_DIMS_BY_VARIABLE["XLONG"], horizontal - 3.0),
+        },
+        coords={"XTIME": (EXPECTED_DIMS_BY_VARIABLE["XTIME"], time)},
+        attrs={"TITLE": "synthetic wrfout", "START_DATE": "2015-04-17_18:00:00"},
+    )
+
+
+def _expected_auto_highlighted_indices(payload: dict[str, object], count: int) -> list[int]:
+    metrics = payload["source_metrics"]  # type: ignore[index]
+    severity = np.asarray(metrics["time_severity_score"], dtype=np.float32)  # type: ignore[index]
+    persistence = np.asarray(metrics["time_persistence_fraction"], dtype=np.float32)  # type: ignore[index]
+    risk = np.asarray(metrics["time_risk_horizontal_fraction"], dtype=np.float32)  # type: ignore[index]
+    active = np.asarray(metrics["time_active_level_fraction"], dtype=np.float32)  # type: ignore[index]
+
+    selected: list[int] = []
+    seen: set[int] = set()
+    for index in [int(np.argmax(severity)), int(np.argmax(persistence)), int(np.argmax(risk))]:
+        if index in seen:
+            continue
+        selected.append(index)
+        seen.add(index)
+        if len(selected) >= count:
+            return selected
+
+    fallback = sorted(
+        range(severity.shape[0]),
+        key=lambda index: (
+            float(severity[index]),
+            float(persistence[index]),
+            float(risk[index]),
+            float(active[index]),
+        ),
+        reverse=True,
+    )
+    for index in fallback:
+        if index in seen:
+            continue
+        selected.append(index)
+        seen.add(index)
+        if len(selected) >= count:
+            break
+    return selected
 
 
 def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> None:
@@ -297,3 +391,166 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["selected_time_label"] == "2015-04-17T18:00:00"
     assert final_payload["source_metrics"]["severity_class"] == "moderate"
     assert final_payload["outputs"]["png"].endswith(".png")
+
+
+def test_highlighted_times_summary_explicit_selection_exports_traceable_metadata(tmp_path: Path) -> None:
+    dataset = _build_highlighted_times_dataset()
+    phase5_product = build_phase5_approximate_risk_product(dataset, "synthetic.nc", time_index=1)
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=1)
+    summary = build_highlighted_times_summary(
+        phase6_product,
+        "synthetic.nc",
+        source_mode="heuristic-severity",
+        highlighted_times=[3, 1, 3, -1],
+        source_artifacts={
+            "phase5_markdown": Path("phase5.md"),
+            "phase5_json": Path("phase5.json"),
+            "phase5_netcdf": Path("phase5.nc"),
+            "phase5_png": Path("phase5.png"),
+            "phase6_markdown": Path("phase6.md"),
+            "phase6_json": Path("phase6.json"),
+            "phase6_netcdf": Path("phase6.nc"),
+            "phase6_png": Path("phase6.png"),
+        },
+    )
+    markdown_path, json_path, png_path = write_highlighted_times_outputs(summary, tmp_path)
+
+    assert markdown_path.exists()
+    assert json_path.exists()
+    assert png_path.exists()
+    assert "_explicit_t003_t001" in markdown_path.name
+    assert "_explicit_t003_t001" in json_path.name
+    assert "_explicit_t003_t001" in png_path.name
+
+    markdown_text = markdown_path.read_text(encoding="utf-8")
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert "## Highlighted times" in markdown_text
+    assert "Selection mode: explicit" in markdown_text
+    assert "selected from the user-requested highlighted-time list" in markdown_text
+    assert "Reference time index: 1" in markdown_text
+    assert payload["artifact_kind"] == "presentation/final-product/highlighted-times"
+    assert payload["comparison_mode"] == "highlighted-times"
+    assert payload["source_mode"] == "heuristic-severity"
+    assert payload["reference_time_index"] == 1
+    assert payload["reference_time_label"] == "2015-04-17T19:00:00"
+    assert payload["selection_mode"] == "explicit"
+    assert payload["highlighted_time_count"] == 2
+    assert payload["highlighted_time_indices"] == [3, 1]
+    assert payload["highlighted_time_labels"] == ["2015-04-17T21:00:00", "2015-04-17T19:00:00"]
+    assert payload["highlighted_time_reasons"] == [
+        "selected from the user-requested highlighted-time list",
+        "selected from the user-requested highlighted-time list",
+    ]
+    assert len(payload["highlighted_times"]) == 2
+    assert payload["highlighted_times"][0]["selection_rule"] == "explicit-request"
+    assert "highlighted_times" in payload["contract"]["required_metadata_fields"]
+    assert "selection_mode" in payload["contract"]["required_metadata_fields"]
+    assert "comparison_mode" in payload["contract"]["required_metadata_fields"]
+    assert payload["contract"]["selection_modes"] == ["explicit", "auto"]
+    assert payload["contract"]["output_prefix"] == "presentation_final_product_highlighted_times"
+    assert payload["outputs"]["png"].endswith(".png")
+    assert payload["source_metrics"]["selection_mode"] == "explicit"
+    assert payload["source_metrics"]["selection_basis"].startswith("User-requested highlighted times")
+
+
+def test_highlighted_times_summary_auto_selection_is_reproducible(tmp_path: Path) -> None:
+    dataset = _build_highlighted_times_dataset()
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=1)
+    summary = build_highlighted_times_summary(
+        phase6_product,
+        "synthetic.nc",
+        source_mode="approximate-risk",
+        highlighted_time_count=3,
+        source_artifacts={
+            "phase5_markdown": Path("phase5.md"),
+            "phase5_json": Path("phase5.json"),
+            "phase5_netcdf": Path("phase5.nc"),
+            "phase5_png": Path("phase5.png"),
+            "phase6_markdown": Path("phase6.md"),
+            "phase6_json": Path("phase6.json"),
+            "phase6_netcdf": Path("phase6.nc"),
+            "phase6_png": Path("phase6.png"),
+        },
+    )
+    markdown_path, json_path, png_path = write_highlighted_times_outputs(summary, tmp_path)
+
+    assert markdown_path.exists()
+    assert json_path.exists()
+    assert png_path.exists()
+
+    markdown_text = markdown_path.read_text(encoding="utf-8")
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert "Selection mode: auto" in markdown_text
+    assert "severity peak" in markdown_text or "maximum heuristic-severity score" in markdown_text
+    assert payload["selection_mode"] == "auto"
+    assert payload["highlighted_time_count"] == 3
+    assert payload["highlighted_time_indices"] == _expected_auto_highlighted_indices(payload, 3)
+    assert len(payload["highlighted_times"]) == 3
+    assert payload["highlighted_times"][0]["rank"] == 1
+    assert payload["highlighted_times"][0]["selection_rule"] in {"max-severity", "max-persistence", "max-risk-coverage"}
+    assert payload["contract"]["artifact_kind"] == "presentation/final-product/highlighted-times"
+    assert "highlighted_time_indices" in payload["contract"]["required_metadata_fields"]
+    assert "highlighted_times" in payload["contract"]["required_metadata_fields"]
+    assert "comparison_mode" in payload["contract"]["required_metadata_fields"]
+    assert payload["source_metrics"]["peak_severity_time_index"] == int(np.argmax(np.asarray(payload["source_metrics"]["time_severity_score"], dtype=np.float32)))
+    assert payload["source_metrics"]["selection_mode"] == "auto"
+
+
+def test_main_writes_highlighted_times_artifacts_when_requested(tmp_path: Path, monkeypatch) -> None:
+    dataset = _build_highlighted_times_dataset()
+    dataset_file = tmp_path / "dummy.nc"
+    dataset_file.write_text("placeholder", encoding="utf-8")
+    output_dir = tmp_path / "outputs"
+
+    class _DatasetContext:
+        def __init__(self, wrapped: xr.Dataset) -> None:
+            self._wrapped = wrapped
+
+        def __enter__(self) -> xr.Dataset:
+            return self._wrapped
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    monkeypatch.setattr(cli, "open_dataset", lambda path: _DatasetContext(dataset))
+
+    exit_code = cli.main(
+        [
+            "--dataset",
+            str(dataset_file),
+            "--output-dir",
+            str(output_dir),
+            "--time-index",
+            "1",
+            "--final-product",
+            "--final-product-highlighted-count",
+            "3",
+        ]
+    )
+
+    assert exit_code == 0
+    final_markdown = [
+        path
+        for path in sorted(output_dir.glob("presentation_final_product_*.md"))
+        if not path.name.startswith("presentation_final_product_highlighted_times_")
+    ]
+    highlighted_markdown = sorted(output_dir.glob("presentation_final_product_highlighted_times_*.md"))
+    highlighted_json = sorted(output_dir.glob("presentation_final_product_highlighted_times_*.json"))
+    highlighted_png = sorted(output_dir.glob("presentation_final_product_highlighted_times_*.png"))
+
+    assert len(final_markdown) == 1
+    assert len(highlighted_markdown) == 1
+    assert len(highlighted_json) == 1
+    assert len(highlighted_png) == 1
+
+    highlighted_markdown_text = highlighted_markdown[0].read_text(encoding="utf-8")
+    highlighted_payload = json.loads(highlighted_json[0].read_text(encoding="utf-8"))
+
+    assert "Selection mode: auto" in highlighted_markdown_text
+    assert "## Highlighted times" in highlighted_markdown_text
+    assert highlighted_payload["comparison_mode"] == "highlighted-times"
+    assert highlighted_payload["selection_mode"] == "auto"
+    assert highlighted_payload["highlighted_time_count"] == 3
+    assert highlighted_payload["outputs"]["png"].endswith(".png")

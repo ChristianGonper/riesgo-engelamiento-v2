@@ -11,7 +11,12 @@ from .config import (
     FINAL_PRODUCT_VERTICAL_BAND_CHOICES,
 )
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
-from .final_product import build_final_product_summary, write_final_product_outputs
+from .final_product import (
+    build_final_product_summary,
+    build_highlighted_times_summary,
+    write_final_product_outputs,
+    write_highlighted_times_outputs,
+)
 from .phase2 import build_phase2_liquid_product, write_phase2_outputs
 from .phase5 import build_phase5_approximate_risk_product, write_phase5_outputs
 from .phase6 import build_phase6_heuristic_severity_product, write_phase6_outputs
@@ -67,6 +72,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="dominant",
         help="Banda vertical relativa usada en el artefacto final; 'dominant' usa la banda dominante del tiempo seleccionado.",
     )
+    parser.add_argument(
+        "--final-product-highlighted-times",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Indices de tiempo destacados para el comparativo compacto; si se omite, se puede usar la seleccion automatica con --final-product-highlighted-count.",
+    )
+    parser.add_argument(
+        "--final-product-highlighted-count",
+        type=int,
+        default=0,
+        help="Numero de tiempos destacados a seleccionar automaticamente cuando no se pasan indices explicitos. 0 desactiva el comparativo.",
+    )
     return parser
 
 
@@ -112,6 +130,10 @@ def main(argv: list[str] | None = None) -> int:
             final_product_json_path = None
             final_product_png_path = None
             final_product_source_products = None
+            highlighted_times_markdown_path = None
+            highlighted_times_json_path = None
+            highlighted_times_png_path = None
+            highlighted_times_summary = None
             if args.final_product:
                 if args.final_product_view == "approximate-risk":
                     final_product_summary = build_final_product_summary(
@@ -164,6 +186,33 @@ def main(argv: list[str] | None = None) -> int:
                     severity_product=final_product_source_products["severity_product"],
                     source_dataset=dataset,
                 )
+                if args.final_product_highlighted_times is not None or args.final_product_highlighted_count > 0:
+                    highlighted_times_summary = build_highlighted_times_summary(
+                        phase6_product,
+                        args.dataset,
+                        source_mode=args.final_product_view,
+                        reference_time_index=args.time_index,
+                        highlighted_times=args.final_product_highlighted_times,
+                        highlighted_time_count=args.final_product_highlighted_count,
+                        source_artifacts={
+                            "phase5_markdown": phase5_markdown_path,
+                            "phase5_json": phase5_json_path,
+                            "phase5_netcdf": phase5_netcdf_path,
+                            "phase5_png": phase5_png_path,
+                            "phase6_markdown": phase6_markdown_path,
+                            "phase6_json": phase6_json_path,
+                            "phase6_netcdf": phase6_netcdf_path,
+                            "phase6_png": phase6_png_path,
+                        },
+                    )
+                    (
+                        highlighted_times_markdown_path,
+                        highlighted_times_json_path,
+                        highlighted_times_png_path,
+                    ) = write_highlighted_times_outputs(
+                        highlighted_times_summary,
+                        args.output_dir,
+                    )
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -229,4 +278,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Markdown summary written to: {final_product_markdown_path}")
         print(f"JSON summary written to: {final_product_json_path}")
         print(f"PNG presentation map written to: {final_product_png_path}")
+    if highlighted_times_summary is not None:
+        print()
+        print(highlighted_times_summary.to_markdown(
+            {
+                "markdown": highlighted_times_markdown_path,
+                "json": highlighted_times_json_path,
+                "png": highlighted_times_png_path,
+            }
+        ))
+        print()
+        print(f"Markdown summary written to: {highlighted_times_markdown_path}")
+        print(f"JSON summary written to: {highlighted_times_json_path}")
+        print(f"PNG highlighted-times comparison written to: {highlighted_times_png_path}")
     return 0

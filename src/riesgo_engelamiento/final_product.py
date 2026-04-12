@@ -3,14 +3,18 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from matplotlib.ticker import MaxNLocator
 
 from .config import (
     FINAL_PRODUCT_CAVEAT_LABELS,
+    FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX,
+    FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE,
+    FINAL_PRODUCT_HIGHLIGHTED_REQUIRED_METADATA_FIELDS,
     FINAL_PRODUCT_OUTPUT_PREFIX,
     FINAL_PRODUCT_OUTPUT_PURPOSE,
     FINAL_PRODUCT_RENDER_VIEWS,
@@ -835,6 +839,653 @@ def write_final_product_outputs(
     markdown_path.write_text(summary.to_markdown(output_paths), encoding="utf-8")
     json_path.write_text(json.dumps(summary.to_dict(output_paths), indent=2, ensure_ascii=False), encoding="utf-8")
     figure = build_final_product_figure(summary, risk_product, severity_product, source_dataset)
+    figure.savefig(png_path, dpi=DEFAULT_FINAL_PRODUCT_MAP_STYLE.dpi, facecolor=DEFAULT_FINAL_PRODUCT_MAP_STYLE.figure_facecolor)
+    plt.close(figure)
+
+    return markdown_path, json_path, png_path
+
+
+@dataclass(frozen=True, slots=True)
+class HighlightedTimeRecord:
+    rank: int
+    time_index: int
+    time_label: str | None
+    selection_rule: str
+    selection_reason: str
+    severity_score: float
+    severity_class: str
+    persistence_fraction: float
+    risk_horizontal_fraction: float
+    liquid_horizontal_fraction: float
+    mixed_horizontal_fraction: float
+    active_level_fraction: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rank": self.rank,
+            "time_index": self.time_index,
+            "time_label": self.time_label,
+            "selection_rule": self.selection_rule,
+            "selection_reason": self.selection_reason,
+            "severity_score": self.severity_score,
+            "severity_class": self.severity_class,
+            "persistence_fraction": self.persistence_fraction,
+            "risk_horizontal_fraction": self.risk_horizontal_fraction,
+            "liquid_horizontal_fraction": self.liquid_horizontal_fraction,
+            "mixed_horizontal_fraction": self.mixed_horizontal_fraction,
+            "active_level_fraction": self.active_level_fraction,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class HighlightedTimeArtifactContract:
+    artifact_kind: str = FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE
+    output_prefix: str = FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX
+    required_metadata_fields: tuple[str, ...] = FINAL_PRODUCT_HIGHLIGHTED_REQUIRED_METADATA_FIELDS
+    selection_modes: tuple[str, ...] = ("explicit", "auto")
+    caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifact_kind": self.artifact_kind,
+            "output_prefix": self.output_prefix,
+            "required_metadata_fields": list(self.required_metadata_fields),
+            "selection_modes": list(self.selection_modes),
+            "caveat_labels": list(self.caveat_labels),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class HighlightedTimeComparisonSummary:
+    dataset_path: Path
+    reference_time_index: int
+    reference_time_label: str | None
+    source_mode: str
+    source_phase: int
+    source_phase_label: str
+    source_product_kind: str
+    comparison_mode: str
+    selection_mode: str
+    selection_basis: str
+    highlighted_times: tuple[HighlightedTimeRecord, ...]
+    output_purpose: str = FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE
+    contract: HighlightedTimeArtifactContract = field(default_factory=HighlightedTimeArtifactContract)
+    caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
+    source_artifacts: dict[str, Path] = field(default_factory=dict)
+    source_metrics: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self, output_paths: dict[str, Path] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "artifact_kind": self.contract.artifact_kind,
+            "output_purpose": self.output_purpose,
+            "comparison_mode": self.comparison_mode,
+            "dataset_path": str(self.dataset_path),
+            "reference_time_index": self.reference_time_index,
+            "reference_time_label": self.reference_time_label,
+            "source_mode": self.source_mode,
+            "source_phase": self.source_phase,
+            "source_phase_label": self.source_phase_label,
+            "source_product_kind": self.source_product_kind,
+            "selection_mode": self.selection_mode,
+            "selection_basis": self.selection_basis,
+            "highlighted_time_count": len(self.highlighted_times),
+            "highlighted_time_indices": [record.time_index for record in self.highlighted_times],
+            "highlighted_time_labels": [record.time_label for record in self.highlighted_times],
+            "highlighted_time_reasons": [record.selection_reason for record in self.highlighted_times],
+            "highlighted_times": [record.to_dict() for record in self.highlighted_times],
+            "presentation_summary": self.presentation_summary_text(),
+            "comparative_summary": self.comparative_summary_text(),
+            "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "caveat_labels": list(self.caveat_labels),
+            "contract": self.contract.to_dict(),
+            "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
+            "source_metrics": self.source_metrics,
+        }
+        if output_paths is not None:
+            payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
+        return payload
+
+    def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
+        def _format_value(value: Any) -> str:
+            if isinstance(value, Path):
+                return f"`{value}`"
+            if isinstance(value, dict):
+                return json.dumps(value, ensure_ascii=False, sort_keys=True)
+            if isinstance(value, (list, tuple)):
+                return ", ".join(_format_value(item).strip("`") for item in value)
+            if value is None:
+                return "unknown"
+            return str(value)
+
+        def _table(headers: list[str], rows: list[list[str]]) -> str:
+            if not rows:
+                rows = [["none" for _ in headers]]
+            lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join("---" for _ in headers) + " |"]
+            for row in rows:
+                lines.append("| " + " | ".join(row) + " |")
+            return "\n".join(lines)
+
+        highlight_rows = [
+            [
+                str(record.rank),
+                record.time_label or f"t{record.time_index:03d}",
+                record.selection_rule,
+                record.selection_reason,
+                f"{record.severity_score:.1f}",
+                record.severity_class,
+                f"{record.persistence_fraction:.1%}",
+                f"{record.risk_horizontal_fraction:.1%}",
+            ]
+            for record in self.highlighted_times
+        ]
+
+        lines = [
+            "# Producto final de tiempos destacados",
+            "",
+            "## Presentation summary",
+            self.presentation_summary_text(),
+            "",
+            "## Comparative summary",
+            self.comparative_summary_text(),
+            "",
+            "## Aircraft-oriented interpretation",
+            self.aircraft_interpretation_text(),
+            "",
+            f"- Artifact contract: `{self.contract.artifact_kind}`",
+            f"- Output purpose: `{self.output_purpose}`",
+            f"- Comparison mode: `{self.comparison_mode}`",
+            f"- Source mode: `{self.source_mode}`",
+            f"- Source phase: Phase {self.source_phase} ({self.source_phase_label})",
+            f"- Source product kind: {self.source_product_kind}",
+            f"- Reference time index: {self.reference_time_index}",
+            f"- Reference time label: {self.reference_time_label or 'unknown'}",
+            f"- Selection mode: {self.selection_mode}",
+            f"- Selection basis: {self.selection_basis}",
+            f"- Highlighted time count: {len(self.highlighted_times)}",
+            f"- Highlighted time indices: {', '.join(str(record.time_index) for record in self.highlighted_times)}",
+            f"- Highlighted time labels: {', '.join(record.time_label or 'unknown' for record in self.highlighted_times)}",
+            f"- Caveats: {', '.join(self.caveat_labels)}",
+            "",
+            "## Highlighted times",
+            _table(
+                [
+                    "Rank",
+                    "Time",
+                    "Rule",
+                    "Reason",
+                    "Severity",
+                    "Class",
+                    "Persistence",
+                    "Coverage",
+                ],
+                highlight_rows,
+            ),
+            "",
+            "## Contract",
+            f"- Output prefix: `{self.contract.output_prefix}`",
+            f"- Selection modes: {', '.join(self.contract.selection_modes)}",
+            f"- Required metadata fields: {', '.join(self.contract.required_metadata_fields)}",
+            "",
+            "## Source artifacts",
+        ]
+        if self.source_artifacts:
+            for name, path in self.source_artifacts.items():
+                lines.append(f"- {name}: `{path}`")
+        else:
+            lines.append("- none")
+        lines.extend(["", "## Source metrics"])
+        if self.source_metrics:
+            for name, value in self.source_metrics.items():
+                lines.append(f"- {name}: {_format_value(value)}")
+        else:
+            lines.append("- none")
+        if output_paths:
+            lines.extend(["", "## Outputs"])
+            for name, path in output_paths.items():
+                lines.append(f"- {name}: `{path}`")
+        return "\n".join(lines)
+
+    def presentation_summary_text(self) -> str:
+        return (
+            f"Highlighted-time shortlist built from the {self.source_mode} final-product context. "
+            f"Selection mode: {self.selection_mode}. "
+            f"{len(self.highlighted_times)} moments are retained for compact comparison, starting from reference time "
+            f"{self.reference_time_label or self.reference_time_index}."
+        )
+
+    def comparative_summary_text(self) -> str:
+        return (
+            "Each highlighted moment is kept because it optimizes an observable temporal diagnostic: severity peak, "
+            "persistence peak, approximate-risk coverage peak, or a distinct fallback rank when the primary peaks coincide. "
+            "The result is a shortlist for presentation, not the full time series."
+        )
+
+    def aircraft_interpretation_text(self) -> str:
+        return (
+            "Aircraft-oriented reading: compare the shortlisted times as relative temporal snapshots of the icing proxy. "
+            "These times are presentation candidates, not route advice, flight-level evidence, or operational guidance."
+        )
+
+
+def _coerce_time_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, np.ndarray):
+        if value.size == 0:
+            return None
+        if value.shape == ():
+            return _coerce_time_value(value.item())
+        return _coerce_time_value(value.flat[0])
+    if isinstance(value, np.datetime64):
+        return np.datetime_as_string(value, unit="s")
+    if isinstance(value, np.generic):
+        return _coerce_time_value(value.item())
+    text = str(value).strip()
+    return text or None
+
+
+def _series_time_labels(product: Phase6HeuristicSeverityProduct) -> list[str]:
+    time_values = product.time_risk_horizontal_fraction.coords["Time"].values
+    return [_coerce_time_value(value) or str(index) for index, value in enumerate(time_values)]
+
+
+def _highlighted_time_series(product: Phase6HeuristicSeverityProduct) -> dict[str, np.ndarray]:
+    return {
+        "severity_score": np.asarray(product.severity_score_time.values, dtype=np.float32),
+        "persistence_fraction": np.asarray(product.time_persistence_fraction.values, dtype=np.float32),
+        "risk_horizontal_fraction": np.asarray(product.time_risk_horizontal_fraction.values, dtype=np.float32),
+        "liquid_horizontal_fraction": np.asarray(product.time_liquid_horizontal_fraction.values, dtype=np.float32),
+        "mixed_horizontal_fraction": np.asarray(product.time_mixed_horizontal_fraction.values, dtype=np.float32),
+        "active_level_fraction": np.asarray(product.time_active_level_fraction.values, dtype=np.float32),
+        "severity_class": np.asarray(product.severity_class_time, dtype=object),
+    }
+
+
+def _canonicalize_highlighted_time_index(time_index: int, time_count: int) -> int:
+    if time_index < 0:
+        time_index = time_count + time_index
+    if time_index < 0 or time_index >= time_count:
+        raise ValueError(f"time_index {time_index} is outside the available range 0..{time_count - 1}.")
+    return time_index
+
+
+def _highlighted_time_reason(rule: str, *, severity_score: float, persistence_fraction: float, risk_fraction: float) -> str:
+    if rule == "explicit-request":
+        return "selected from the user-requested highlighted-time list"
+    if rule == "max-severity":
+        return f"selected as the maximum heuristic-severity score ({severity_score:.1f}/100)"
+    if rule == "max-persistence":
+        return f"selected as the maximum cumulative persistence fraction ({persistence_fraction:.1%})"
+    if rule == "max-risk-coverage":
+        return f"selected as the maximum approximate-risk coverage ({risk_fraction:.1%})"
+    return "selected as the next-highest distinct time after de-duplicating the primary severity, persistence, and coverage picks"
+
+
+def _select_auto_highlighted_times(
+    series: dict[str, np.ndarray],
+    *,
+    count: int,
+) -> list[tuple[int, str]]:
+    if count <= 0:
+        raise ValueError("highlighted_time_count must be at least 1 when auto-selecting highlighted times.")
+
+    severity = series["severity_score"]
+    persistence = series["persistence_fraction"]
+    risk = series["risk_horizontal_fraction"]
+    active = series["active_level_fraction"]
+    time_count = int(severity.shape[0])
+
+    ordered_candidates = [
+        ("max-severity", int(np.argmax(severity))),
+        ("max-persistence", int(np.argmax(persistence))),
+        ("max-risk-coverage", int(np.argmax(risk))),
+    ]
+    selected: list[tuple[int, str]] = []
+    selected_indices: set[int] = set()
+    for rule, index in ordered_candidates:
+        if index in selected_indices:
+            continue
+        selected.append((index, rule))
+        selected_indices.add(index)
+        if len(selected) >= count:
+            return selected
+
+    fallback_indices = sorted(
+        range(time_count),
+        key=lambda index: (
+            float(severity[index]),
+            float(persistence[index]),
+            float(risk[index]),
+            float(active[index]),
+        ),
+        reverse=True,
+    )
+    for index in fallback_indices:
+        if index in selected_indices:
+            continue
+        selected.append((index, "fallback-composite"))
+        selected_indices.add(index)
+        if len(selected) >= count:
+            break
+    return selected
+
+
+def _select_explicit_highlighted_times(
+    requested_time_indices: Sequence[int],
+    *,
+    time_count: int,
+) -> list[tuple[int, str]]:
+    selected: list[tuple[int, str]] = []
+    seen: set[int] = set()
+    for index in requested_time_indices:
+        canonical_index = _canonicalize_highlighted_time_index(int(index), time_count)
+        if canonical_index in seen:
+            continue
+        seen.add(canonical_index)
+        selected.append((canonical_index, "explicit-request"))
+    if not selected:
+        raise ValueError("At least one highlighted time index must be provided when selecting explicit highlighted times.")
+    return selected
+
+
+def _build_highlighted_time_records(
+    series: dict[str, np.ndarray],
+    selected: list[tuple[int, str]],
+    time_labels: list[str],
+) -> tuple[HighlightedTimeRecord, ...]:
+    records: list[HighlightedTimeRecord] = []
+    for rank, (time_index, selection_rule) in enumerate(selected, start=1):
+        records.append(
+            HighlightedTimeRecord(
+                rank=rank,
+                time_index=time_index,
+                time_label=time_labels[time_index] if time_index < len(time_labels) else None,
+                selection_rule=selection_rule,
+                selection_reason=_highlighted_time_reason(
+                    selection_rule,
+                    severity_score=float(series["severity_score"][time_index]),
+                    persistence_fraction=float(series["persistence_fraction"][time_index]),
+                    risk_fraction=float(series["risk_horizontal_fraction"][time_index]),
+                ),
+                severity_score=float(series["severity_score"][time_index]),
+                severity_class=str(series["severity_class"][time_index]),
+                persistence_fraction=float(series["persistence_fraction"][time_index]),
+                risk_horizontal_fraction=float(series["risk_horizontal_fraction"][time_index]),
+                liquid_horizontal_fraction=float(series["liquid_horizontal_fraction"][time_index]),
+                mixed_horizontal_fraction=float(series["mixed_horizontal_fraction"][time_index]),
+                active_level_fraction=float(series["active_level_fraction"][time_index]),
+            )
+        )
+    return tuple(records)
+
+
+def build_highlighted_times_summary(
+    source_product: Phase6HeuristicSeverityProduct,
+    dataset_path: str | Path,
+    *,
+    source_mode: str,
+    reference_time_index: int | None = None,
+    highlighted_times: Sequence[int] | None = None,
+    highlighted_time_count: int = 3,
+    source_artifacts: Mapping[str, Path] | None = None,
+) -> HighlightedTimeComparisonSummary:
+    dataset_path = Path(dataset_path)
+    time_labels = _series_time_labels(source_product)
+    series = _highlighted_time_series(source_product)
+    time_count = int(series["severity_score"].shape[0])
+    if time_count == 0:
+        raise ValueError("Cannot build a highlighted-time comparison from an empty temporal series.")
+
+    reference_index = source_product.time_index if reference_time_index is None else _canonicalize_highlighted_time_index(
+        int(reference_time_index),
+        time_count,
+    )
+    reference_label = source_product.time_label if reference_time_index is None else time_labels[reference_index]
+    if highlighted_times is not None:
+        selected = _select_explicit_highlighted_times(highlighted_times, time_count=time_count)
+        selection_mode = "explicit"
+        selection_basis = "User-requested highlighted times were canonicalized, de-duplicated, and kept in the order provided."
+    else:
+        selected = _select_auto_highlighted_times(series, count=min(max(int(highlighted_time_count), 1), time_count))
+        selection_mode = "auto"
+        selection_basis = (
+            "Auto-selection ranks the series by severity peak, persistence peak, and approximate-risk coverage peak; "
+            "remaining slots are filled by the next-highest distinct composite signal."
+        )
+
+    highlighted_records = _build_highlighted_time_records(
+        series,
+        selected,
+        time_labels,
+    )
+
+    peak_severity_index = int(np.argmax(series["severity_score"]))
+    peak_persistence_index = int(np.argmax(series["persistence_fraction"]))
+    peak_coverage_index = int(np.argmax(series["risk_horizontal_fraction"]))
+
+    source_metrics = {
+        "time_count": time_count,
+        "time_labels": time_labels,
+        "time_severity_score": series["severity_score"].tolist(),
+        "time_persistence_fraction": series["persistence_fraction"].tolist(),
+        "time_risk_horizontal_fraction": series["risk_horizontal_fraction"].tolist(),
+        "time_liquid_horizontal_fraction": series["liquid_horizontal_fraction"].tolist(),
+        "time_mixed_horizontal_fraction": series["mixed_horizontal_fraction"].tolist(),
+        "time_active_level_fraction": series["active_level_fraction"].tolist(),
+        "time_severity_class": [str(value) for value in series["severity_class"].tolist()],
+        "reference_severity_score": float(source_product.severity_score),
+        "reference_severity_class": source_product.severity_class,
+        "reference_persistence_fraction": float(source_product.persistence_fraction),
+        "reference_dominant_band": source_product.dominant_band,
+        "reference_time_risk_fraction": float(source_product.time_risk_horizontal_fraction.values[source_product.time_index]),
+        "reference_time_liquid_fraction": float(source_product.time_liquid_horizontal_fraction.values[source_product.time_index]),
+        "reference_time_mixed_fraction": float(source_product.time_mixed_horizontal_fraction.values[source_product.time_index]),
+        "peak_severity_time_index": peak_severity_index,
+        "peak_persistence_time_index": peak_persistence_index,
+        "peak_coverage_time_index": peak_coverage_index,
+        "peak_severity_score": float(series["severity_score"][peak_severity_index]),
+        "peak_persistence_fraction": float(series["persistence_fraction"][peak_persistence_index]),
+        "peak_coverage_fraction": float(series["risk_horizontal_fraction"][peak_coverage_index]),
+        "selection_basis": selection_basis,
+        "selection_mode": selection_mode,
+    }
+
+    return HighlightedTimeComparisonSummary(
+        dataset_path=dataset_path,
+        reference_time_index=reference_index,
+        reference_time_label=reference_label,
+        source_mode=source_mode,
+        source_phase=6,
+        source_phase_label="highlighted time selection",
+        source_product_kind="phase-6 heuristic severity time-series",
+        comparison_mode="highlighted-times",
+        selection_mode=selection_mode,
+        selection_basis=selection_basis,
+        highlighted_times=highlighted_records,
+        source_artifacts=_coerce_source_artifacts(source_artifacts),
+        source_metrics=source_metrics,
+    )
+
+
+def _highlighted_times_annotation_lines(summary: HighlightedTimeComparisonSummary) -> tuple[str, ...]:
+    lines = [
+        f"Reference time: {summary.reference_time_label or summary.reference_time_index}",
+        f"Selection mode: {summary.selection_mode}",
+        f"Selection basis: {summary.selection_basis}",
+        "",
+    ]
+    for record in summary.highlighted_times:
+        lines.extend(
+            [
+                f"#{record.rank} {record.time_label or record.time_index}",
+                f"Rule: {record.selection_rule}",
+                f"Reason: {record.selection_reason}",
+                f"Severity: {record.severity_score:.1f}/100 ({record.severity_class})",
+                f"Persistence: {record.persistence_fraction:.1%} | Risk: {record.risk_horizontal_fraction:.1%} | Liquid: {record.liquid_horizontal_fraction:.1%}",
+                "",
+            ]
+        )
+    return tuple(lines)
+
+
+def build_highlighted_times_figure(
+    summary: HighlightedTimeComparisonSummary,
+    *,
+    style=DEFAULT_FINAL_PRODUCT_MAP_STYLE,
+):
+    fig = plt.figure(
+        figsize=(style.figure_size[0], style.figure_size[1] + 1.9),
+        dpi=style.dpi,
+        facecolor=style.figure_facecolor,
+        constrained_layout=True,
+    )
+    grid = fig.add_gridspec(3, 1, height_ratios=[1.25, 0.95, 1.1])
+    series_ax = fig.add_subplot(grid[0, 0])
+    compare_ax = fig.add_subplot(grid[1, 0])
+    notes_ax = fig.add_subplot(grid[2, 0])
+
+    time_labels = summary.source_metrics.get("time_labels", [])
+    time_positions = np.arange(len(time_labels))
+    severity = np.asarray(summary.source_metrics.get("time_severity_score", []), dtype=np.float32)
+    persistence = np.asarray(summary.source_metrics.get("time_persistence_fraction", []), dtype=np.float32) * 100.0
+    risk = np.asarray(summary.source_metrics.get("time_risk_horizontal_fraction", []), dtype=np.float32) * 100.0
+
+    series_ax.plot(time_positions, severity, color="#111827", marker="o", linewidth=1.8, label="Severity score")
+    series_ax.plot(time_positions, persistence, color="#2563eb", marker="s", linestyle="--", linewidth=1.3, label="Persistence (%)")
+    series_ax.plot(time_positions, risk, color="#b91c1c", marker="^", linestyle=":", linewidth=1.3, label="Risk coverage (%)")
+    for record in summary.highlighted_times:
+        series_ax.axvline(record.time_index, color="#d97706", linestyle="--", linewidth=0.9, alpha=0.45, zorder=0)
+        series_ax.scatter(
+            record.time_index,
+            severity[record.time_index],
+            s=86,
+            color="#f59e0b",
+            edgecolor="#111827",
+            linewidth=0.8,
+            zorder=5,
+        )
+        series_ax.annotate(
+            f"#{record.rank}",
+            (record.time_index, severity[record.time_index]),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            color=style.text_color,
+            fontsize=9,
+            fontweight="bold",
+        )
+    series_ax.set_title(
+        "Highlighted times across the selected series",
+        loc="left",
+        color=style.title_color,
+        fontweight="bold",
+        pad=12,
+    )
+    series_ax.text(
+        0.0,
+        1.02,
+        f"Reference time {summary.reference_time_label or summary.reference_time_index} | mode {summary.source_mode} | {summary.selection_mode}",
+        transform=series_ax.transAxes,
+        ha="left",
+        va="bottom",
+        color=style.subtitle_color,
+        fontsize=10.0,
+    )
+    series_ax.set_ylabel("Score / percent")
+    series_ax.set_xticks(time_positions)
+    series_ax.set_xticklabels(time_labels, rotation=45, ha="right")
+    series_ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
+    series_ax.grid(True, color=style.grid_color, linestyle="--", linewidth=0.6, alpha=0.28)
+    legend = series_ax.legend(
+        loc="upper left",
+        frameon=True,
+        framealpha=0.95,
+        facecolor=style.legend_facecolor,
+        edgecolor=style.legend_edgecolor,
+    )
+    for text in legend.get_texts():
+        text.set_color(style.text_color)
+    series_ax.tick_params(colors=style.text_color)
+
+    compare_positions = np.arange(len(summary.highlighted_times))
+    bar_width = 0.24
+    compare_ax.bar(
+        compare_positions - bar_width,
+        [record.severity_score for record in summary.highlighted_times],
+        width=bar_width,
+        color="#111827",
+        label="Severity score",
+    )
+    compare_ax.bar(
+        compare_positions,
+        [record.persistence_fraction * 100.0 for record in summary.highlighted_times],
+        width=bar_width,
+        color="#2563eb",
+        label="Persistence (%)",
+    )
+    compare_ax.bar(
+        compare_positions + bar_width,
+        [record.risk_horizontal_fraction * 100.0 for record in summary.highlighted_times],
+        width=bar_width,
+        color="#b91c1c",
+        label="Risk coverage (%)",
+    )
+    compare_ax.set_title("Compact comparison for the highlighted shortlist", loc="left", color=style.title_color, pad=10, fontweight="bold")
+    compare_ax.set_ylabel("Score / percent")
+    compare_ax.set_xticks(compare_positions)
+    compare_ax.set_xticklabels(
+        [f"#{record.rank}\n{record.time_label or record.time_index}" for record in summary.highlighted_times]
+    )
+    compare_ax.set_ylim(0.0, 100.0)
+    compare_ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+    compare_ax.grid(True, axis="y", color=style.grid_color, linestyle="--", linewidth=0.6, alpha=0.28)
+    compare_ax.legend(
+        loc="upper right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor=style.legend_facecolor,
+        edgecolor=style.legend_edgecolor,
+    )
+    compare_ax.tick_params(colors=style.text_color)
+
+    render_annotation_panel(
+        notes_ax,
+        "Highlighted-time selection notes",
+        _highlighted_times_annotation_lines(summary),
+        footer="Compact presentation output built from phase-6 temporal diagnostics and the current final-product context.",
+        style=style,
+    )
+    fig.suptitle(
+        f"Riesgo de engelamiento - tiempos destacados ({summary.selection_mode})",
+        color=style.title_color,
+        fontsize=16,
+        fontweight="bold",
+    )
+    return fig
+
+
+def write_highlighted_times_outputs(
+    summary: HighlightedTimeComparisonSummary,
+    output_dir: str | Path,
+) -> tuple[Path, Path, Path]:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    indices_slug = "_".join(f"t{record.time_index:03d}" for record in summary.highlighted_times)
+    base_name = f"{FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX}_ref_t{summary.reference_time_index:03d}_{summary.selection_mode}_{indices_slug}"
+    markdown_path = output_path / f"{base_name}.md"
+    json_path = output_path / f"{base_name}.json"
+    png_path = output_path / f"{base_name}.png"
+
+    output_paths = {
+        "markdown": markdown_path,
+        "json": json_path,
+        "png": png_path,
+    }
+
+    markdown_path.write_text(summary.to_markdown(output_paths), encoding="utf-8")
+    json_path.write_text(json.dumps(summary.to_dict(output_paths), indent=2, ensure_ascii=False), encoding="utf-8")
+    figure = build_highlighted_times_figure(summary)
     figure.savefig(png_path, dpi=DEFAULT_FINAL_PRODUCT_MAP_STYLE.dpi, facecolor=DEFAULT_FINAL_PRODUCT_MAP_STYLE.figure_facecolor)
     plt.close(figure)
 

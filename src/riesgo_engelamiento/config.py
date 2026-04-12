@@ -11,6 +11,8 @@ FINAL_PRODUCT_RENDER_VIEWS = (
     "approximate-risk",
     "heuristic-severity",
 )
+FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX = "presentation_final_product_highlighted_times"
+FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE = "presentation/final-product/highlighted-times"
 FINAL_PRODUCT_CAVEAT_LABELS = (
     "selected-time presentation wrapper over diagnostic phases",
     "diagnostic source remains a proxy, not an operational forecast",
@@ -40,6 +42,31 @@ FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
     "dominant_band_level_count",
     "dominant_band_meaning",
     "band_relation",
+    "presentation_summary",
+    "comparative_summary",
+    "aircraft_interpretation",
+    "caveat_labels",
+    "source_artifacts",
+    "source_metrics",
+    "outputs",
+)
+FINAL_PRODUCT_HIGHLIGHTED_REQUIRED_METADATA_FIELDS = (
+    "artifact_kind",
+    "output_purpose",
+    "comparison_mode",
+    "reference_time_index",
+    "reference_time_label",
+    "source_mode",
+    "source_phase",
+    "source_phase_label",
+    "source_product_kind",
+    "selection_mode",
+    "selection_basis",
+    "highlighted_time_count",
+    "highlighted_time_indices",
+    "highlighted_time_labels",
+    "highlighted_time_reasons",
+    "highlighted_times",
     "presentation_summary",
     "comparative_summary",
     "aircraft_interpretation",
