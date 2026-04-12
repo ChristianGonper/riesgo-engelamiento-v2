@@ -182,6 +182,9 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert markdown_path.exists()
     assert json_path.exists()
     assert png_path.exists()
+    assert markdown_path.name.startswith("presentation_final_deliverable_")
+    assert json_path.name.startswith("presentation_final_deliverable_")
+    assert png_path.name.startswith("presentation_final_deliverable_")
     assert "_band_upper" in markdown_path.name
     assert "_band_upper" in json_path.name
     assert "_band_upper" in png_path.name
@@ -192,17 +195,21 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "## Presentation summary" in markdown_text
     assert "## Comparative summary" in markdown_text
     assert "## Aircraft-oriented interpretation" in markdown_text
-    assert "Artifact contract: `presentation/final-product`" in markdown_text
+    assert "Artifact contract: `presentation/final-deliverable`" in markdown_text
     assert "Render view: `approximate-risk`" in markdown_text
     assert "Source phase: Phase 5" in markdown_text
     assert "Selected band request: upper" in markdown_text
     assert "Selected band: upper" in markdown_text
     assert "Selected band resolution: explicit" in markdown_text
     assert "Band relation: selected band upper differs from dominant band lower" in markdown_text
+    assert "Delivery mode: entregable final canónico" in markdown_text
     assert "Approximate-risk is the binary Phase 5 proxy footprint" in markdown_text
     assert "not operational icing guidance" in markdown_text
     assert "phase5_markdown" in markdown_text
-    assert payload["artifact_kind"] == "presentation/final-product"
+    assert payload["artifact_kind"] == "presentation/final-deliverable"
+    assert payload["output_purpose"] == "presentation/final-deliverable"
+    assert payload["delivery_mode"] == "canonical"
+    assert payload["delivery_label"] == "entregable final canónico"
     assert payload["source_mode"] == "approximate-risk"
     assert payload["render_view"] == "approximate-risk"
     assert payload["source_phase"] == 5
@@ -223,8 +230,14 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert payload["dominant_band_level_count"] == 1
     assert payload["dominant_band_meaning"] == "Lower relative eta band of the model-level stack"
     assert payload["band_relation"] == "selected band upper differs from dominant band lower"
+    assert payload["contract"]["artifact_kind"] == "presentation/final-deliverable"
+    assert payload["contract"]["output_prefix"] == "presentation_final_deliverable"
+    assert payload["contract"]["delivery_mode"] == "canonical"
+    assert payload["contract"]["delivery_label"] == "entregable final canónico"
     assert "selected_time_index" in payload["contract"]["required_metadata_fields"]
     assert "selected_time_label" in payload["contract"]["required_metadata_fields"]
+    assert "delivery_mode" in payload["contract"]["required_metadata_fields"]
+    assert "delivery_label" in payload["contract"]["required_metadata_fields"]
     assert "selected_band_request" in payload["contract"]["required_metadata_fields"]
     assert "selected_band" in payload["contract"]["required_metadata_fields"]
     assert "selected_band_resolution" in payload["contract"]["required_metadata_fields"]
@@ -239,6 +252,7 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "outputs" in payload["contract"]["required_metadata_fields"]
     assert payload["contract"]["supported_views"] == ["approximate-risk", "heuristic-severity"]
     assert payload["presentation_summary"].startswith("Mode selected: approximate-risk.")
+    assert "Delivery mode: entregable final canónico" in payload["presentation_summary"]
     assert "Rendered band: upper" in payload["presentation_summary"]
     assert "selected-band risk" in payload["presentation_summary"]
     assert "heuristic-severity" in payload["comparative_summary"]
@@ -285,6 +299,7 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         assert extent[2] < 40.0 < extent[3]
         annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
         assert "Final product annotations" in annotation_text
+        assert "Delivery mode: entregable final canónico" in annotation_text
         assert "Presentation summary:" in annotation_text
         assert "Comparative summary:" in annotation_text
         assert "Aircraft-oriented interpretation:" in annotation_text
@@ -301,6 +316,68 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         assert colorbar_axis.get_ylabel() == "Band-conditioned heuristic severity score (0-100)"
     finally:
         plt.close(figure)
+
+
+def test_main_writes_canonical_final_deliverable_artifacts_when_requested(tmp_path: Path, monkeypatch) -> None:
+    dataset = _build_final_product_dataset()
+    dataset_file = tmp_path / "dummy.nc"
+    dataset_file.write_text("placeholder", encoding="utf-8")
+    output_dir = tmp_path / "outputs"
+
+    class _DatasetContext:
+        def __init__(self, wrapped: xr.Dataset) -> None:
+            self._wrapped = wrapped
+
+        def __enter__(self) -> xr.Dataset:
+            return self._wrapped
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    monkeypatch.setattr(cli, "open_dataset", lambda path: _DatasetContext(dataset))
+
+    exit_code = cli.main(
+        [
+            "--dataset",
+            str(dataset_file),
+            "--output-dir",
+            str(output_dir),
+            "--time-index",
+            "0",
+            "--final-deliverable",
+            "--final-product-band",
+            "upper",
+        ]
+    )
+
+    assert exit_code == 0
+    final_markdown = sorted(output_dir.glob("presentation_final_deliverable_*.md"))
+    final_json = sorted(output_dir.glob("presentation_final_deliverable_*.json"))
+    final_png = sorted(output_dir.glob("presentation_final_deliverable_*.png"))
+
+    assert len(final_markdown) == 1
+    assert len(final_json) == 1
+    assert len(final_png) == 1
+    assert "_band_upper" in final_markdown[0].name
+    assert "_band_upper" in final_json[0].name
+    assert "_band_upper" in final_png[0].name
+
+    final_markdown_text = final_markdown[0].read_text(encoding="utf-8")
+    final_payload = json.loads(final_json[0].read_text(encoding="utf-8"))
+
+    assert "Artifact contract: `presentation/final-deliverable`" in final_markdown_text
+    assert "Delivery mode: `canonical`" in final_markdown_text
+    assert "Delivery label: entregable final canónico" in final_markdown_text
+    assert "Mode selected: heuristic-severity." in final_payload["presentation_summary"]
+    assert final_payload["artifact_kind"] == "presentation/final-deliverable"
+    assert final_payload["output_purpose"] == "presentation/final-deliverable"
+    assert final_payload["delivery_mode"] == "canonical"
+    assert final_payload["delivery_label"] == "entregable final canónico"
+    assert final_payload["contract"]["output_prefix"] == "presentation_final_deliverable"
+    assert final_payload["contract"]["artifact_kind"] == "presentation/final-deliverable"
+    assert final_payload["selected_band_request"] == "upper"
+    assert final_payload["selected_band"] == "upper"
+    assert final_payload["selected_band_resolution"] == "explicit"
 
 
 def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monkeypatch) -> None:
@@ -357,6 +434,8 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     final_payload = json.loads(final_json[0].read_text(encoding="utf-8"))
 
     assert "Artifact contract: `presentation/final-product`" in final_markdown_text
+    assert "Delivery mode: `legacy`" in final_markdown_text
+    assert "Delivery label: producto final heredado" in final_markdown_text
     assert "Render view: `heuristic-severity`" in final_markdown_text
     assert "Source phase: Phase 6" in final_markdown_text
     assert "Selected band request: upper" in final_markdown_text
@@ -371,6 +450,10 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["render_view"] == "heuristic-severity"
     assert final_payload["source_mode"] == "heuristic-severity"
     assert final_payload["source_phase"] == 6
+    assert final_payload["artifact_kind"] == "presentation/final-product"
+    assert final_payload["output_purpose"] == "presentation/final-product"
+    assert final_payload["delivery_mode"] == "legacy"
+    assert final_payload["delivery_label"] == "producto final heredado"
     assert final_payload["map_field_kind"] == "Spatial heuristic severity score (upper band)"
     assert "band-conditioned" in final_payload["map_semantics"]
     assert "Cartopy PlateCarree map" in final_payload["map_geographic_context"]
@@ -380,9 +463,11 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["selected_band_signal_status"] == "empty"
     assert final_payload["dominant_band"] == "lower"
     assert final_payload["presentation_summary"].startswith("Mode selected: heuristic-severity.")
+    assert "Delivery mode: producto final heredado" in final_payload["presentation_summary"]
     assert "severity moderate" in final_payload["presentation_summary"]
     assert "Heuristic-severity adds a graded, band-conditioned score" in final_payload["comparative_summary"]
     assert "not operational icing guidance" in final_payload["aircraft_interpretation"]
+    assert final_payload["contract"]["output_prefix"] == "presentation_final_product"
     assert "map_geographic_context" in final_payload["contract"]["required_metadata_fields"]
     assert "presentation_summary" in final_payload["contract"]["required_metadata_fields"]
     assert "comparative_summary" in final_payload["contract"]["required_metadata_fields"]

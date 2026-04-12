@@ -5,8 +5,16 @@ from dataclasses import dataclass
 CORE_T0_K = 300.0
 DEFAULT_DATASET_NAME = "wrfout_d01_2015-04-17_18_00_00_corte"
 DEFAULT_OUTPUT_DIR_NAME = "outputs"
-FINAL_PRODUCT_OUTPUT_PREFIX = "presentation_final_product"
-FINAL_PRODUCT_OUTPUT_PURPOSE = "presentation/final-product"
+FINAL_PRODUCT_CANONICAL_OUTPUT_PREFIX = "presentation_final_deliverable"
+FINAL_PRODUCT_CANONICAL_OUTPUT_PURPOSE = "presentation/final-deliverable"
+FINAL_PRODUCT_LEGACY_OUTPUT_PREFIX = "presentation_final_product"
+FINAL_PRODUCT_LEGACY_OUTPUT_PURPOSE = "presentation/final-product"
+FINAL_PRODUCT_OUTPUT_PREFIX = FINAL_PRODUCT_CANONICAL_OUTPUT_PREFIX
+FINAL_PRODUCT_OUTPUT_PURPOSE = FINAL_PRODUCT_CANONICAL_OUTPUT_PURPOSE
+FINAL_PRODUCT_DELIVERY_MODES = (
+    "canonical",
+    "legacy",
+)
 FINAL_PRODUCT_RENDER_VIEWS = (
     "approximate-risk",
     "heuristic-severity",
@@ -22,6 +30,8 @@ FINAL_PRODUCT_CAVEAT_LABELS = (
 FINAL_PRODUCT_REQUIRED_METADATA_FIELDS = (
     "artifact_kind",
     "output_purpose",
+    "delivery_mode",
+    "delivery_label",
     "source_mode",
     "render_view",
     "source_phase",

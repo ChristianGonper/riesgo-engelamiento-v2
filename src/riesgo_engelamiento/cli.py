@@ -55,10 +55,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         help="Indice de tiempo a usar para las fases 2, 5 y 6.",
     )
-    parser.add_argument(
+    final_product_group = parser.add_mutually_exclusive_group()
+    final_product_group.add_argument(
+        "--final-deliverable",
+        action="store_true",
+        help="Genera el entregable final canonico para un tiempo seleccionado.",
+    )
+    final_product_group.add_argument(
         "--final-product",
         action="store_true",
-        help="Genera tambien el artefacto final de presentacion para un tiempo seleccionado.",
+        help="Alias legado del entregable final canonico; mantiene el prefijo historico de producto final.",
     )
     parser.add_argument(
         "--final-product-view",
@@ -134,13 +140,15 @@ def main(argv: list[str] | None = None) -> int:
             highlighted_times_json_path = None
             highlighted_times_png_path = None
             highlighted_times_summary = None
-            if args.final_product:
+            if args.final_deliverable or args.final_product:
+                delivery_mode = "canonical" if args.final_deliverable else "legacy"
                 if args.final_product_view == "approximate-risk":
                     final_product_summary = build_final_product_summary(
                         phase5_product,
                         args.dataset,
                         render_view=args.final_product_view,
                         selected_band=args.final_product_band,
+                        delivery_mode=delivery_mode,
                         severity_product=phase6_product,
                         source_artifacts={
                             "phase5_markdown": phase5_markdown_path,
@@ -159,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.dataset,
                         render_view=args.final_product_view,
                         selected_band=args.final_product_band,
+                        delivery_mode=delivery_mode,
                         severity_product=phase6_product,
                         source_artifacts={
                             "phase6_markdown": phase6_markdown_path,
@@ -265,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"JSON summary written to: {phase6_json_path}")
     print(f"NetCDF heuristic severity product written to: {phase6_netcdf_path}")
     print(f"PNG heuristic severity product written to: {phase6_png_path}")
-    if args.final_product and final_product_summary is not None:
+    if final_product_summary is not None:
         print()
         print(final_product_summary.to_markdown(
             {
@@ -277,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print(f"Markdown summary written to: {final_product_markdown_path}")
         print(f"JSON summary written to: {final_product_json_path}")
-        print(f"PNG presentation map written to: {final_product_png_path}")
+        print(f"PNG {final_product_summary.delivery_label} written to: {final_product_png_path}")
     if highlighted_times_summary is not None:
         print()
         print(highlighted_times_summary.to_markdown(

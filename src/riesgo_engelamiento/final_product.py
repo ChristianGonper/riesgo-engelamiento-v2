@@ -11,10 +11,15 @@ import xarray as xr
 from matplotlib.ticker import MaxNLocator
 
 from .config import (
+    FINAL_PRODUCT_CANONICAL_OUTPUT_PREFIX,
+    FINAL_PRODUCT_CANONICAL_OUTPUT_PURPOSE,
     FINAL_PRODUCT_CAVEAT_LABELS,
+    FINAL_PRODUCT_DELIVERY_MODES,
     FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX,
     FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE,
     FINAL_PRODUCT_HIGHLIGHTED_REQUIRED_METADATA_FIELDS,
+    FINAL_PRODUCT_LEGACY_OUTPUT_PREFIX,
+    FINAL_PRODUCT_LEGACY_OUTPUT_PURPOSE,
     FINAL_PRODUCT_OUTPUT_PREFIX,
     FINAL_PRODUCT_OUTPUT_PURPOSE,
     FINAL_PRODUCT_RENDER_VIEWS,
@@ -33,10 +38,28 @@ from .presentation_map import (
 )
 
 
+def _delivery_profile(delivery_mode: str) -> tuple[str, str, str]:
+    if delivery_mode == "canonical":
+        return (
+            FINAL_PRODUCT_CANONICAL_OUTPUT_PREFIX,
+            FINAL_PRODUCT_CANONICAL_OUTPUT_PURPOSE,
+            "entregable final canónico",
+        )
+    if delivery_mode == "legacy":
+        return (
+            FINAL_PRODUCT_LEGACY_OUTPUT_PREFIX,
+            FINAL_PRODUCT_LEGACY_OUTPUT_PURPOSE,
+            "producto final heredado",
+        )
+    raise ValueError(f"Unsupported final-product delivery mode: {delivery_mode}")
+
+
 @dataclass(frozen=True, slots=True)
 class FinalProductArtifactContract:
     artifact_kind: str = FINAL_PRODUCT_OUTPUT_PURPOSE
     output_prefix: str = FINAL_PRODUCT_OUTPUT_PREFIX
+    delivery_mode: str = "canonical"
+    delivery_label: str = "entregable final canónico"
     supported_views: tuple[str, ...] = FINAL_PRODUCT_RENDER_VIEWS
     required_metadata_fields: tuple[str, ...] = FINAL_PRODUCT_REQUIRED_METADATA_FIELDS
     caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
@@ -45,6 +68,8 @@ class FinalProductArtifactContract:
         return {
             "artifact_kind": self.artifact_kind,
             "output_prefix": self.output_prefix,
+            "delivery_mode": self.delivery_mode,
+            "delivery_label": self.delivery_label,
             "supported_views": list(self.supported_views),
             "required_metadata_fields": list(self.required_metadata_fields),
             "caveat_labels": list(self.caveat_labels),
@@ -56,6 +81,8 @@ class FinalProductSummary:
     dataset_path: Path
     time_index: int
     time_label: str | None
+    delivery_mode: str
+    delivery_label: str
     source_mode: str
     render_view: str
     source_phase: int
@@ -86,6 +113,8 @@ class FinalProductSummary:
         payload: dict[str, Any] = {
             "artifact_kind": self.contract.artifact_kind,
             "output_purpose": self.output_purpose,
+            "delivery_mode": self.delivery_mode,
+            "delivery_label": self.delivery_label,
             "dataset_path": str(self.dataset_path),
             "selected_time_index": self.time_index,
             "selected_time_label": self.time_label,
@@ -134,7 +163,9 @@ class FinalProductSummary:
             return str(value)
 
         lines = [
-            "# Producto final de presentacion",
+            f"# {self.delivery_label.title()}",
+            "",
+            f"Modo de entrega: {self.delivery_label}.",
             "",
             "## Presentation summary",
             self.presentation_summary_text(),
@@ -147,6 +178,8 @@ class FinalProductSummary:
             "",
             f"- Artifact contract: `{self.contract.artifact_kind}`",
             f"- Output purpose: `{self.output_purpose}`",
+            f"- Delivery mode: `{self.delivery_mode}`",
+            f"- Delivery label: {self.delivery_label}",
             f"- Source mode: `{self.source_mode}`",
             f"- Render view: `{self.render_view}`",
             f"- Source phase: Phase {self.source_phase} ({self.source_phase_label})",
@@ -235,6 +268,7 @@ class FinalProductSummary:
     def presentation_summary_text(self) -> str:
         return (
             f"Mode selected: {self.render_view}. "
+            f"Delivery mode: {self.delivery_label}; "
             f"Rendered band: {self.selected_band} ({self.selected_band_resolution}); "
             f"dominant band: {self.dominant_band}; "
             f"{self.band_relation}; "
@@ -518,6 +552,7 @@ def _final_product_annotation_lines(
     spatial_severity_stats: dict[str, Any] | None = None,
 ) -> tuple[str, ...]:
     lines: list[str] = [
+        f"Delivery mode: {summary.delivery_label}",
         f"Presentation summary: {summary.presentation_summary_text()}",
         f"Comparative summary: {summary.comparative_summary_text()}",
         f"Aircraft-oriented interpretation: {summary.aircraft_interpretation_text()}",
@@ -687,7 +722,7 @@ def build_final_product_figure(
         style=style,
     )
     fig.suptitle(
-        f"Riesgo de engelamiento - producto final de presentacion ({summary.selected_band} band)",
+        f"Riesgo de engelamiento - {summary.delivery_label} ({summary.selected_band} band)",
         color=style.title_color,
         fontsize=16,
         fontweight="bold",
@@ -701,11 +736,18 @@ def build_final_product_summary(
     *,
     render_view: str,
     selected_band: str = "dominant",
+    delivery_mode: str = "canonical",
     severity_product: Phase6HeuristicSeverityProduct | None = None,
     source_artifacts: Mapping[str, Path] | None = None,
 ) -> FinalProductSummary:
     source_artifacts_map = _coerce_source_artifacts(source_artifacts)
     dataset_path = Path(dataset_path)
+    if delivery_mode not in FINAL_PRODUCT_DELIVERY_MODES:
+        raise ValueError(
+            f"Unsupported final-product delivery mode: {delivery_mode}. "
+            f"Available choices: {', '.join(FINAL_PRODUCT_DELIVERY_MODES)}"
+        )
+    output_prefix, output_purpose, delivery_label = _delivery_profile(delivery_mode)
     reference_severity_product = severity_product
     if reference_severity_product is None and isinstance(source_product, Phase6HeuristicSeverityProduct):
         reference_severity_product = source_product
@@ -755,6 +797,8 @@ def build_final_product_summary(
             dataset_path=dataset_path,
             time_index=source_product.time_index,
             time_label=source_product.time_label,
+            delivery_mode=delivery_mode,
+            delivery_label=delivery_label,
             source_mode=render_view,
             render_view=render_view,
             source_phase=5,
@@ -766,6 +810,13 @@ def build_final_product_summary(
                 f"and conditioned on the selected {resolved_band_name} model-relative band"
             ),
             map_geographic_context="Cartopy PlateCarree map with Natural Earth borders and coastlines framing the selected WRF domain",
+            output_purpose=output_purpose,
+            contract=FinalProductArtifactContract(
+                artifact_kind=output_purpose,
+                output_prefix=output_prefix,
+                delivery_mode=delivery_mode,
+                delivery_label=delivery_label,
+            ),
             **band_metadata,
             source_artifacts=source_artifacts_map,
             source_metrics=source_metrics,
@@ -788,6 +839,8 @@ def build_final_product_summary(
             dataset_path=dataset_path,
             time_index=source_product.time_index,
             time_label=source_product.time_label,
+            delivery_mode=delivery_mode,
+            delivery_label=delivery_label,
             source_mode=render_view,
             render_view=render_view,
             source_phase=6,
@@ -799,6 +852,13 @@ def build_final_product_summary(
                 "mixed-phase presence, and coherence within the selected model-relative band"
             ),
             map_geographic_context="Cartopy PlateCarree map with Natural Earth borders and coastlines framing the selected WRF domain",
+            output_purpose=output_purpose,
+            contract=FinalProductArtifactContract(
+                artifact_kind=output_purpose,
+                output_prefix=output_prefix,
+                delivery_mode=delivery_mode,
+                delivery_label=delivery_label,
+            ),
             **band_metadata,
             source_artifacts=source_artifacts_map,
             source_metrics=source_metrics,
@@ -823,7 +883,7 @@ def write_final_product_outputs(
     output_path.mkdir(parents=True, exist_ok=True)
 
     base_name = (
-        f"{FINAL_PRODUCT_OUTPUT_PREFIX}_t{summary.time_index:03d}_"
+        f"{summary.contract.output_prefix}_t{summary.time_index:03d}_"
         f"{_view_slug(summary.render_view)}_band_{_view_slug(summary.selected_band)}"
     )
     markdown_path = output_path / f"{base_name}.md"
