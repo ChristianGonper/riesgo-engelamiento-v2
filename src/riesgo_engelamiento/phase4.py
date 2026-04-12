@@ -21,7 +21,7 @@ from .config import (
     HEURISTIC_SEVERITY_WEIGHTS,
     HEURISTIC_VERTICAL_BANDS,
 )
-from .phase3 import build_phase3_approximate_risk_product
+from .phase5 import build_phase5_approximate_risk_product
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt  # noqa: E402
@@ -478,7 +478,7 @@ def build_phase4_heuristic_severity_product(
 
     selected_time_index = _canonical_time_index(dataset, time_index)
     selected = dataset.isel(Time=selected_time_index)
-    selected_phase3 = build_phase3_approximate_risk_product(dataset, dataset_path, time_index=selected_time_index)
+    selected_phase5 = build_phase5_approximate_risk_product(dataset, dataset_path, time_index=selected_time_index)
 
     eta_mid = _eta_mid(dataset)
     time_coord = dataset["XTIME"] if "XTIME" in dataset else xr.DataArray(np.arange(dataset.sizes["Time"]), dims=("Time",))
@@ -576,8 +576,8 @@ def build_phase4_heuristic_severity_product(
         time_index=selected_time_index,
         time_label=_selected_time_label(selected),
         horizontal_shape=(
-            int(selected_phase3.liquid_presence.sizes.get("south_north", 0)),
-            int(selected_phase3.liquid_presence.sizes.get("west_east", 0)),
+            int(selected_phase5.liquid_presence.sizes.get("south_north", 0)),
+            int(selected_phase5.liquid_presence.sizes.get("west_east", 0)),
         ),
         vertical_levels=int(dataset.sizes.get("bottom_top", 0)),
         eta_mid=eta_mid,

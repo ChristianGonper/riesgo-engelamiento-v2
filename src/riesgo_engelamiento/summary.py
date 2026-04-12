@@ -175,7 +175,7 @@ def _build_diagnostics(dataset: xr.Dataset, validation: ValidationReport) -> tup
             DiagnosticStatus(
                 name="Approximate icing risk",
                 status="available with caveats",
-                reason="PB is absent, so the risk product remains approximate and must use T + 300, P and ZNW as a proxy path.",
+                reason="PB is absent, so the phase-5 risk product remains approximate and must use T + 300, P and ZNW as a proxy path.",
             )
         )
     severity_required = {"QCLOUD", "QRAIN", "QICE", "T", "P", "ZNW"}

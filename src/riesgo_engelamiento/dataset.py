@@ -102,7 +102,7 @@ def validate_dataset(dataset: xr.Dataset, source: str | Path | None = None) -> V
 
     warnings: list[str] = []
     if "PB" not in dataset:
-        warnings.append("PB is absent, so phase-3 thermodynamic reconstruction will remain approximate.")
+        warnings.append("PB is absent, so phase-5 thermodynamic reconstruction will remain approximate.")
     if not source_path:
         source_path = None
 

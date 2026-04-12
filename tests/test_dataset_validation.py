@@ -148,10 +148,10 @@ def test_main_writes_artifacts_even_when_validation_fails(tmp_path: Path, monkey
     assert not any(output_dir.glob("phase2_liquid_presence_*.json"))
     assert not any(output_dir.glob("phase2_liquid_presence_*.nc"))
     assert not any(output_dir.glob("phase2_liquid_presence_*.png"))
-    assert not any(output_dir.glob("phase3_approximate_icing_risk_*.md"))
-    assert not any(output_dir.glob("phase3_approximate_icing_risk_*.json"))
-    assert not any(output_dir.glob("phase3_approximate_icing_risk_*.nc"))
-    assert not any(output_dir.glob("phase3_approximate_icing_risk_*.png"))
+    assert not any(output_dir.glob("phase5_approximate_icing_risk_*.md"))
+    assert not any(output_dir.glob("phase5_approximate_icing_risk_*.json"))
+    assert not any(output_dir.glob("phase5_approximate_icing_risk_*.nc"))
+    assert not any(output_dir.glob("phase5_approximate_icing_risk_*.png"))
     assert not any(output_dir.glob("phase4_heuristic_severity_*.md"))
     assert not any(output_dir.glob("phase4_heuristic_severity_*.json"))
     assert not any(output_dir.glob("phase4_heuristic_severity_*.nc"))
@@ -227,10 +227,10 @@ def test_main_writes_phase2_artifacts_for_selected_time(tmp_path: Path, monkeypa
     phase2_json = sorted(output_dir.glob("phase2_liquid_presence_*.json"))
     phase2_netcdf = sorted(output_dir.glob("phase2_liquid_presence_*.nc"))
     phase2_png = sorted(output_dir.glob("phase2_liquid_presence_*.png"))
-    phase3_markdown = sorted(output_dir.glob("phase3_approximate_icing_risk_*.md"))
-    phase3_json = sorted(output_dir.glob("phase3_approximate_icing_risk_*.json"))
-    phase3_netcdf = sorted(output_dir.glob("phase3_approximate_icing_risk_*.nc"))
-    phase3_png = sorted(output_dir.glob("phase3_approximate_icing_risk_*.png"))
+    phase5_markdown = sorted(output_dir.glob("phase5_approximate_icing_risk_*.md"))
+    phase5_json = sorted(output_dir.glob("phase5_approximate_icing_risk_*.json"))
+    phase5_netcdf = sorted(output_dir.glob("phase5_approximate_icing_risk_*.nc"))
+    phase5_png = sorted(output_dir.glob("phase5_approximate_icing_risk_*.png"))
     phase4_markdown = sorted(output_dir.glob("phase4_heuristic_severity_*.md"))
     phase4_json = sorted(output_dir.glob("phase4_heuristic_severity_*.json"))
     phase4_netcdf = sorted(output_dir.glob("phase4_heuristic_severity_*.nc"))
@@ -241,13 +241,15 @@ def test_main_writes_phase2_artifacts_for_selected_time(tmp_path: Path, monkeypa
     assert len(phase2_netcdf) == 1
     assert len(phase2_png) == 1
     assert "Liquid cells: 2 / 6" in phase2_markdown[0].read_text(encoding="utf-8")
-    assert len(phase3_markdown) == 1
-    assert len(phase3_json) == 1
-    assert len(phase3_netcdf) == 1
-    assert len(phase3_png) == 1
-    phase3_markdown_text = phase3_markdown[0].read_text(encoding="utf-8")
-    assert "theta = T + 300 K" in phase3_markdown_text
-    assert "Approximate icing risk in selected time: present" in phase3_markdown_text
+    assert len(phase5_markdown) == 1
+    assert len(phase5_json) == 1
+    assert len(phase5_netcdf) == 1
+    assert len(phase5_png) == 1
+    phase5_markdown_text = phase5_markdown[0].read_text(encoding="utf-8")
+    assert "# Fase 5: riesgo aproximado de engelamiento" in phase5_markdown_text
+    assert "Product kind: approximate proxy" in phase5_markdown_text
+    assert "theta = T + 300 K" in phase5_markdown_text
+    assert "Approximate icing risk in selected time: present" in phase5_markdown_text
     assert len(phase4_markdown) == 1
     assert len(phase4_json) == 1
     assert len(phase4_netcdf) == 1

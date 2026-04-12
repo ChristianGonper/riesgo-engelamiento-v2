@@ -7,7 +7,7 @@ from pathlib import Path
 from .config import DEFAULT_DATASET_NAME, DEFAULT_OUTPUT_DIR_NAME
 from .dataset import DatasetValidationError, assert_valid, open_dataset, validate_dataset
 from .phase2 import build_phase2_liquid_product, write_phase2_outputs
-from .phase3 import build_phase3_approximate_risk_product, write_phase3_outputs
+from .phase5 import build_phase5_approximate_risk_product, write_phase5_outputs
 from .phase4 import build_phase4_heuristic_severity_product, write_phase4_outputs
 from .summary import build_phase1_summary, write_phase1_outputs
 
@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--time-index",
         type=int,
         default=0,
-        help="Indice de tiempo a usar para las fases 2 y 3.",
+        help="Indice de tiempo a usar para las fases 2 y 5.",
     )
     return parser
 
@@ -74,9 +74,9 @@ def main(argv: list[str] | None = None) -> int:
                 phase2_product,
                 args.output_dir,
             )
-            phase3_product = build_phase3_approximate_risk_product(dataset, args.dataset, time_index=args.time_index)
-            phase3_markdown_path, phase3_json_path, phase3_netcdf_path, phase3_png_path = write_phase3_outputs(
-                phase3_product,
+            phase5_product = build_phase5_approximate_risk_product(dataset, args.dataset, time_index=args.time_index)
+            phase5_markdown_path, phase5_json_path, phase5_netcdf_path, phase5_png_path = write_phase5_outputs(
+                phase5_product,
                 args.output_dir,
             )
             phase4_product = build_phase4_heuristic_severity_product(dataset, args.dataset, time_index=args.time_index)
@@ -108,19 +108,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"NetCDF mask written to: {phase2_netcdf_path}")
     print(f"PNG mask written to: {phase2_png_path}")
     print()
-    print(phase3_product.to_markdown(
+    print(phase5_product.to_markdown(
         {
-            "markdown": phase3_markdown_path,
-            "json": phase3_json_path,
-            "netcdf": phase3_netcdf_path,
-            "png": phase3_png_path,
+            "markdown": phase5_markdown_path,
+            "json": phase5_json_path,
+            "netcdf": phase5_netcdf_path,
+            "png": phase5_png_path,
         }
     ))
     print()
-    print(f"Markdown summary written to: {phase3_markdown_path}")
-    print(f"JSON summary written to: {phase3_json_path}")
-    print(f"NetCDF risk product written to: {phase3_netcdf_path}")
-    print(f"PNG risk product written to: {phase3_png_path}")
+    print(f"Markdown summary written to: {phase5_markdown_path}")
+    print(f"JSON summary written to: {phase5_json_path}")
+    print(f"NetCDF approximate-risk proxy written to: {phase5_netcdf_path}")
+    print(f"PNG risk product written to: {phase5_png_path}")
     print()
     print(phase4_product.to_markdown(
         {

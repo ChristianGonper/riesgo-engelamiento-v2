@@ -62,9 +62,16 @@ class Phase3ApproximateRiskProduct:
     has_risk: bool
     approximation_notes: tuple[str, ...]
 
-    def to_dict(self, output_paths: dict[str, Path] | None = None) -> dict[str, Any]:
+    def to_dict(
+        self,
+        output_paths: dict[str, Path] | None = None,
+        *,
+        phase_number: int = 5,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "dataset_path": str(self.dataset_path),
+            "phase": phase_number,
+            "product_kind": "approximate proxy",
             "time_index": self.time_index,
             "time_label": self.time_label,
             "horizontal_shape": list(self.horizontal_shape),
@@ -107,13 +114,19 @@ class Phase3ApproximateRiskProduct:
             payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
         return payload
 
-    def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
+    def to_markdown(
+        self,
+        output_paths: dict[str, Path] | None = None,
+        *,
+        phase_number: int = 5,
+    ) -> str:
         liquid_status = "present" if self.has_liquid else "absent"
         risk_status = "present" if self.has_risk else "absent"
         lines = [
-            "# Fase 3: riesgo aproximado de engelamiento",
+            f"# Fase {phase_number}: riesgo aproximado de engelamiento",
             "",
             f"- Dataset: `{self.dataset_path}`",
+            "- Product kind: approximate proxy",
             f"- Time index: {self.time_index}",
             f"- Time label: {self.time_label or 'unknown'}",
             f"- Horizontal grid: {self.horizontal_shape[0]} x {self.horizontal_shape[1]}",
@@ -348,7 +361,7 @@ def build_phase3_approximate_risk_product(
     )
 
 
-def _build_output_dataset(product: Phase3ApproximateRiskProduct) -> xr.Dataset:
+def _build_output_dataset(product: Phase3ApproximateRiskProduct, *, phase_number: int = 5) -> xr.Dataset:
     theta = product.theta.copy()
     theta.attrs.update(
         {
@@ -433,7 +446,9 @@ def _build_output_dataset(product: Phase3ApproximateRiskProduct) -> xr.Dataset:
             "eta_mid": product.theta.coords["eta_mid"],
         },
         attrs={
-            "title": "Phase 3 approximate icing-risk diagnostic",
+            "title": f"Phase {phase_number} approximate icing-risk diagnostic",
+            "phase": phase_number,
+            "product_kind": "approximate proxy",
             "source_dataset": str(product.dataset_path),
             "time_index": product.time_index,
             "time_label": product.time_label or "unknown",
@@ -478,14 +493,16 @@ def _render_risk_mask(product: Phase3ApproximateRiskProduct, output_path: Path) 
     plt.close(fig)
 
 
-def write_phase3_outputs(
+def _write_approximate_risk_outputs(
     product: Phase3ApproximateRiskProduct,
     output_dir: str | Path,
+    *,
+    phase_number: int,
 ) -> tuple[Path, Path, Path, Path]:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    base_name = f"phase3_approximate_icing_risk_t{product.time_index:03d}"
+    base_name = f"phase{phase_number}_approximate_icing_risk_t{product.time_index:03d}"
     markdown_path = output_path / f"{base_name}.md"
     json_path = output_path / f"{base_name}.json"
     netcdf_path = output_path / f"{base_name}.nc"
@@ -498,9 +515,37 @@ def write_phase3_outputs(
         "png": png_path,
     }
 
-    _build_output_dataset(product).to_netcdf(netcdf_path)
+    _build_output_dataset(product, phase_number=phase_number).to_netcdf(netcdf_path)
     _render_risk_mask(product, png_path)
-    markdown_path.write_text(product.to_markdown(output_paths), encoding="utf-8")
-    json_path.write_text(json.dumps(product.to_dict(output_paths), indent=2, ensure_ascii=False), encoding="utf-8")
+    markdown_path.write_text(product.to_markdown(output_paths, phase_number=phase_number), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(product.to_dict(output_paths, phase_number=phase_number), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     return markdown_path, json_path, netcdf_path, png_path
+
+
+def write_phase3_outputs(
+    product: Phase3ApproximateRiskProduct,
+    output_dir: str | Path,
+) -> tuple[Path, Path, Path, Path]:
+    return _write_approximate_risk_outputs(product, output_dir, phase_number=3)
+
+
+Phase5ApproximateRiskProduct = Phase3ApproximateRiskProduct
+
+
+def build_phase5_approximate_risk_product(
+    dataset: xr.Dataset,
+    dataset_path: str | Path,
+    time_index: int = 0,
+) -> Phase5ApproximateRiskProduct:
+    return build_phase3_approximate_risk_product(dataset, dataset_path, time_index=time_index)
+
+
+def write_phase5_outputs(
+    product: Phase5ApproximateRiskProduct,
+    output_dir: str | Path,
+) -> tuple[Path, Path, Path, Path]:
+    return _write_approximate_risk_outputs(product, output_dir, phase_number=5)
