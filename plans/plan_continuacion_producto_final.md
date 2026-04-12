@@ -10,7 +10,7 @@ Durable decisions that apply across all phases:
 - **Scientific baseline**: final-product outputs must consume the already implemented Phase 5 approximate-risk product and Phase 6 heuristic-severity product rather than recomputing thermodynamics independently.
 - **Product separation**: the repository should continue to distinguish between technical diagnostics and presentation-oriented final products, with explicit labels for proxy and heuristic outputs.
 - **Vertical representation**: flight-oriented views will be expressed through model-level / eta-relative bands unless a future dataset provides the missing variables for geometric altitude.
-- **Geographic rendering**: final maps should add visible geographic context to the WRF domain while remaining reproducible within the project environment and dependency model.
+- **Geographic rendering**: final maps should add visible geographic context to the WRF domain, including country borders or coast/administrative outlines that make the territorial context readable, while remaining reproducible within the project environment and dependency model.
 - **Output families**: each final-product phase should emit both a presentation artifact and machine-readable metadata that explains what was rendered.
 - **Interpretation policy**: aircraft-oriented conclusions must be framed as guided interpretation of relative bands and heuristic/proxy products, not as certified operational icing guidance.
 - **Testing strategy**: tests should continue to validate observable outputs, metadata, CLI behavior, and band-selection semantics without coupling to fragile pixel-perfect image assertions.
@@ -41,11 +41,12 @@ Create the first tracer-bullet path for the new final-product layer. The pipelin
 
 ### What to build
 
-Add a presentation-quality map for the selected time that renders the domain with improved geographic context, clearer legend design, stronger visual hierarchy, and a more informative styling than the current binary technical PNGs. This slice should make the final-product figure demoable on its own.
+Add a presentation-quality map for the selected time that renders the domain with improved geographic context, including visible country borders/territorial outlines, clearer legend design, stronger visual hierarchy, and a more informative styling than the current binary technical PNGs. This slice should make the final-product figure demoable on its own.
 
 ### Acceptance criteria
 
 - [ ] The final-product output includes a map with visible geographic context beyond the raw WRF mask alone.
+- [ ] The final-product map shows country borders or comparable territorial outlines clearly enough to locate the risk over the map.
 - [ ] The map legend and title make clear whether the figure shows approximate risk or heuristic severity.
 - [ ] The visual design expresses gradation or category meaning more clearly than the current technical PNGs.
 - [ ] The figure includes enough annotation or framing to be understandable without opening the Markdown summary first.

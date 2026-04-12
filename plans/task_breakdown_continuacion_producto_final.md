@@ -11,6 +11,7 @@ Vamos a transformar el pipeline diagnóstico ya implementado en un producto fina
 - La representación vertical seguirá siendo relativa al modelo o a bandas eta; no se afirmará altitud geométrica exacta.
 - Los artefactos finales deben diferenciarse claramente de los artefactos técnicos mediante nomenclatura, metadatos y texto visible.
 - La parte cartográfica y la parte de resumen interpretativo deben estar separadas para mantener testabilidad.
+- El mapa final debe mostrar fronteras o contornos de países de forma visible; lat/lon y fondo plano por sí solos no son suficientes para este entregable.
 - Las pruebas deben validar semántica observable, metadatos y flujo CLI, no hacer snapshot visual píxel a píxel.
 
 ## Dependency Graph
@@ -135,15 +136,16 @@ Final-product CLI/config
 
 ## Task 5: Render first presentation-quality final map
 
-**Description:** Implement the first real final-product map for a selected time with better geographic context, stronger legend design, and more interpretable presentation than the existing technical PNGs. This should be demoable as the first “showable” output.
+**Description:** Implement the first real final-product map for a selected time with better geographic context, fronteras o contornos de países visibles, stronger legend design, and more interpretable presentation than the existing technical PNGs. This should be demoable as the first “showable” output.
 
 **Acceptance criteria:**
 - [ ] The final-product artifact includes a map with visible geographic context.
+- [ ] The final-product artifact includes country borders or equivalent territorial outlines that are clearly visible in the final map.
 - [ ] The map title and legend identify whether the view is approximate risk or heuristic severity.
 - [ ] The map is visually more informative than the current binary technical output.
 
 **Verification:**
-- [ ] Manual check: compare the new final map against the current technical PNGs.
+- [ ] Manual check: compare the new final map against the current technical PNGs and confirm that country borders/territorial outlines are visible.
 - [ ] Manual check: the figure is understandable without opening the code.
 - [ ] Tests pass: artifact generation and metadata tests.
 
@@ -459,6 +461,7 @@ Final-product CLI/config
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Cartographic dependency adds setup friction or portability issues | High | Prefer incremental styling first; only add heavier geo dependencies if the visual gain is clearly worth it |
+| Country-border requirement is impossible with the current plotting stack alone | High | Adopt a reproducible cartographic dependency or bundled boundary source early instead of simulating context with plain axes |
 | Final-product layer starts recomputing scientific logic | High | Enforce reuse of Phase 5 and Phase 6 outputs through a dedicated contract |
 | “Aircraft-oriented” language becomes too operational for the data quality | High | Keep wording explicitly interpretive and caveated in both map and summary |
 | Vertical-band UX becomes confusing without real altitude | Medium | Use stable relative band names and repeat eta/model-level caveats visibly |
