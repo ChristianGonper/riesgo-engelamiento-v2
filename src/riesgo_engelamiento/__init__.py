@@ -1,4 +1,4 @@
-"""Riesgo de engelamiento: utilidades de validacion y resumen de fase 1."""
+"""Riesgo de engelamiento: utilidades de validacion y diagnostico liquido."""
 
 from .config import CORE_T0_K, DEFAULT_DATASET_NAME
 

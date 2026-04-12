@@ -40,6 +40,7 @@ EXPECTED_DIMS_BY_VARIABLE = {
 
 SUPPORTED_DIAGNOSTICS = (
     "liquid-water presence from QCLOUD + QRAIN",
+    "binary horizontal liquid mask for a selected time step",
     "ice-context support from QICE",
     "relative vertical structure in model levels / eta coordinates",
     "approximate thermodynamics are deferred because PB is absent",
@@ -48,7 +49,7 @@ SUPPORTED_DIAGNOSTICS = (
 LIMITATIONS = (
     "PB is absent, so exact pressure and exact temperature reconstruction are not possible.",
     "PH, PHB and HGT are absent, so geometric altitude products are out of scope for phase 1.",
-    "The current summary is descriptive and does not compute the phase-2 liquid mask yet.",
+    "The phase-2 liquid mask is a horizontal binary proxy and does not yet estimate icing severity.",
 )
 
 ASSUMPTIONS = (
