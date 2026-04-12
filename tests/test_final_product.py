@@ -95,6 +95,9 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     markdown_text = markdown_path.read_text(encoding="utf-8")
     payload = json.loads(json_path.read_text(encoding="utf-8"))
 
+    assert "## Presentation summary" in markdown_text
+    assert "## Comparative summary" in markdown_text
+    assert "## Aircraft-oriented interpretation" in markdown_text
     assert "Artifact contract: `presentation/final-product`" in markdown_text
     assert "Render view: `approximate-risk`" in markdown_text
     assert "Source phase: Phase 5" in markdown_text
@@ -102,6 +105,8 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "Selected band: upper" in markdown_text
     assert "Selected band resolution: explicit" in markdown_text
     assert "Band relation: selected band upper differs from dominant band lower" in markdown_text
+    assert "Approximate-risk is the binary Phase 5 proxy footprint" in markdown_text
+    assert "not operational icing guidance" in markdown_text
     assert "phase5_markdown" in markdown_text
     assert payload["artifact_kind"] == "presentation/final-product"
     assert payload["source_mode"] == "approximate-risk"
@@ -131,11 +136,20 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "selected_band_resolution" in payload["contract"]["required_metadata_fields"]
     assert "dominant_band" in payload["contract"]["required_metadata_fields"]
     assert "band_relation" in payload["contract"]["required_metadata_fields"]
+    assert "presentation_summary" in payload["contract"]["required_metadata_fields"]
+    assert "comparative_summary" in payload["contract"]["required_metadata_fields"]
+    assert "aircraft_interpretation" in payload["contract"]["required_metadata_fields"]
     assert "map_field_kind" in payload["contract"]["required_metadata_fields"]
     assert "map_semantics" in payload["contract"]["required_metadata_fields"]
     assert "map_geographic_context" in payload["contract"]["required_metadata_fields"]
     assert "outputs" in payload["contract"]["required_metadata_fields"]
     assert payload["contract"]["supported_views"] == ["approximate-risk", "heuristic-severity"]
+    assert payload["presentation_summary"].startswith("Mode selected: approximate-risk.")
+    assert "Rendered band: upper" in payload["presentation_summary"]
+    assert "selected-band risk" in payload["presentation_summary"]
+    assert "heuristic-severity" in payload["comparative_summary"]
+    assert "binary Phase 5 proxy footprint" in payload["comparative_summary"]
+    assert "not a flight level" in payload["aircraft_interpretation"]
     assert payload["source_metrics"]["has_risk"] is True
     assert payload["source_metrics"]["selected_band_signal_status"] == "empty"
     assert "map_geographic_context" in payload
@@ -177,6 +191,9 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         assert extent[2] < 40.0 < extent[3]
         annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
         assert "Final product annotations" in annotation_text
+        assert "Presentation summary:" in annotation_text
+        assert "Comparative summary:" in annotation_text
+        assert "Aircraft-oriented interpretation:" in annotation_text
         assert "heuristic-severity" in annotation_text
         assert "Selected band: lower" in annotation_text
         assert "Selected band resolution: dominant" in annotation_text
@@ -251,6 +268,9 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert "Selected band request: upper" in final_markdown_text
     assert "Selected band: upper" in final_markdown_text
     assert "Selected band signal status: empty" in final_markdown_text
+    assert "## Presentation summary" in final_markdown_text
+    assert "## Comparative summary" in final_markdown_text
+    assert "## Aircraft-oriented interpretation" in final_markdown_text
     assert "phase6_markdown" in final_markdown_text
     assert "Cartopy PlateCarree map" in final_markdown_text
     assert "png" in final_markdown_text
@@ -265,7 +285,14 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["selected_band_resolution"] == "explicit"
     assert final_payload["selected_band_signal_status"] == "empty"
     assert final_payload["dominant_band"] == "lower"
+    assert final_payload["presentation_summary"].startswith("Mode selected: heuristic-severity.")
+    assert "severity moderate" in final_payload["presentation_summary"]
+    assert "Heuristic-severity adds a graded, band-conditioned score" in final_payload["comparative_summary"]
+    assert "not operational icing guidance" in final_payload["aircraft_interpretation"]
     assert "map_geographic_context" in final_payload["contract"]["required_metadata_fields"]
+    assert "presentation_summary" in final_payload["contract"]["required_metadata_fields"]
+    assert "comparative_summary" in final_payload["contract"]["required_metadata_fields"]
+    assert "aircraft_interpretation" in final_payload["contract"]["required_metadata_fields"]
     assert final_payload["selected_time_index"] == 0
     assert final_payload["selected_time_label"] == "2015-04-17T18:00:00"
     assert final_payload["source_metrics"]["severity_class"] == "moderate"

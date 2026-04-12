@@ -105,6 +105,9 @@ class FinalProductSummary:
             "dominant_band_level_count": self.dominant_band_level_count,
             "dominant_band_meaning": self.dominant_band_meaning,
             "band_relation": self.band_relation,
+            "presentation_summary": self.presentation_summary_text(),
+            "comparative_summary": self.comparative_summary_text(),
+            "aircraft_interpretation": self.aircraft_interpretation_text(),
             "caveat_labels": list(self.caveat_labels),
             "contract": self.contract.to_dict(),
             "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
@@ -128,6 +131,15 @@ class FinalProductSummary:
 
         lines = [
             "# Producto final de presentacion",
+            "",
+            "## Presentation summary",
+            self.presentation_summary_text(),
+            "",
+            "## Comparative summary",
+            self.comparative_summary_text(),
+            "",
+            "## Aircraft-oriented interpretation",
+            self.aircraft_interpretation_text(),
             "",
             f"- Artifact contract: `{self.contract.artifact_kind}`",
             f"- Output purpose: `{self.output_purpose}`",
@@ -184,6 +196,67 @@ class FinalProductSummary:
         if value is None:
             return "unknown"
         return f"{value[0]:.2f} -> {value[1]:.2f}"
+
+    def _coverage_summary(self) -> str:
+        metrics = self.source_metrics
+        parts: list[str] = []
+
+        if self.render_view == "approximate-risk":
+            selected_band_horizontal_fraction = metrics.get("selected_band_horizontal_fraction")
+            if selected_band_horizontal_fraction is not None:
+                parts.append(f"selected-band coverage {float(selected_band_horizontal_fraction):.1%}")
+            selected_band_risk_fraction = metrics.get("selected_band_risk_fraction")
+            if selected_band_risk_fraction is not None:
+                parts.append(f"selected-band risk {float(selected_band_risk_fraction):.1%}")
+        else:
+            severity_class = metrics.get("severity_class") or self.source_metrics.get("severity_class")
+            severity_score = metrics.get("severity_score")
+            if severity_class is not None and severity_score is not None:
+                parts.append(f"severity {severity_class} ({float(severity_score):.1f}/100)")
+            selected_band_mean_risk_fraction = metrics.get("selected_band_mean_risk_fraction")
+            if selected_band_mean_risk_fraction is not None:
+                parts.append(f"selected-band mean risk {float(selected_band_mean_risk_fraction):.1%}")
+
+        risk_horizontal_fraction = metrics.get("risk_horizontal_fraction")
+        if risk_horizontal_fraction is not None:
+            parts.append(f"domain risk {float(risk_horizontal_fraction):.1%}")
+        liquid_horizontal_fraction = metrics.get("liquid_horizontal_fraction")
+        if liquid_horizontal_fraction is not None:
+            parts.append(f"domain liquid {float(liquid_horizontal_fraction):.1%}")
+
+        if not parts:
+            return "coverage unavailable"
+        return "; ".join(parts)
+
+    def presentation_summary_text(self) -> str:
+        return (
+            f"Mode selected: {self.render_view}. "
+            f"Rendered band: {self.selected_band} ({self.selected_band_resolution}); "
+            f"dominant band: {self.dominant_band}; "
+            f"{self.band_relation}; "
+            f"{self._coverage_summary()}. "
+            "Caveats: proxy-only, model-relative eta bands, no exact altitude."
+        )
+
+    def comparative_summary_text(self) -> str:
+        if self.render_view == "approximate-risk":
+            return (
+                "Approximate-risk is the binary Phase 5 proxy footprint; heuristic-severity keeps the same "
+                "selected time and band context but adds a graded score from risk/liquid overlap, mixed-phase "
+                "presence and coherence. The severity view adds structure, not operational certainty."
+            )
+        return (
+            "Heuristic-severity adds a graded, band-conditioned score to the Phase 5 proxy footprint; "
+            "approximate-risk stays binary and shows where the proxy is present without ranking intensity. "
+            "Both remain presentation-oriented proxy views."
+        )
+
+    def aircraft_interpretation_text(self) -> str:
+        return (
+            f"Aircraft-oriented reading: the {self.selected_band} band is a model-relative layer, not a flight level. "
+            "Use it to compare relative vertical structure and spatial extent only; this is not operational icing "
+            "guidance, route advice, or exact altitude inference."
+        )
 
 
 def _coerce_source_artifacts(source_artifacts: Mapping[str, Path] | None) -> dict[str, Path]:
@@ -441,6 +514,10 @@ def _final_product_annotation_lines(
     spatial_severity_stats: dict[str, Any] | None = None,
 ) -> tuple[str, ...]:
     lines: list[str] = [
+        f"Presentation summary: {summary.presentation_summary_text()}",
+        f"Comparative summary: {summary.comparative_summary_text()}",
+        f"Aircraft-oriented interpretation: {summary.aircraft_interpretation_text()}",
+        "",
         f"Render view: {summary.render_view}",
         f"Source phase: Phase {summary.source_phase} ({summary.source_phase_label})",
         f"Source product kind: {summary.source_product_kind}",
