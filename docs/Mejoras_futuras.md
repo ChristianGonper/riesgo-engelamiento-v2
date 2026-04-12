@@ -1,5 +1,9 @@
 ## Repo
-- Mapa *bonito*, no solo la máscara de resultados.
+- REvisar los resultados y decidir qué mejorar:
+    - Pulido visual
+    - Pulido de redacción
+    - Cualquier otra mejora
+- Si se desea una nueva fase de desarrollo más allá del pulido, la dirección más segura es mejorar la calidad de la presentación en lugar de reabrir la base científica.
 
 ## General
 - Implementar la fase previa de generación de tareas para tener un plan de implementación menos abstracto. ¿Y separar las fases en diferentes archivos?
