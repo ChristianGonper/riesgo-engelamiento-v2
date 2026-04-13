@@ -1,7 +1,7 @@
 # Phased Orchestration Reference
 
 Primary expected input:
-- A phased task-breakdown document like `plans/task_breakdown_continuacion_producto_final.md`
+- A phased task-breakdown document like `plans/task_breakdown_.md`
 - Optional user constraints about model choice, git policy, documentation, and external research
 
 ## Intent
@@ -25,6 +25,7 @@ For each phase:
 
 1. Identify the exact phase and task slice to execute now from the task breakdown.
 2. Prepare the subagent brief:
+   - Path to the task-breakdown file
    - Goal of the phase
    - Specific tasks being executed in this round
    - Relevant files, modules, or ownership boundary
@@ -34,6 +35,7 @@ For each phase:
    - Documentation or git expectations
    - Whether external research is allowed in this run
 3. Launch the subagent with the model named by the user.
+   - Explicitly tell the subagent to open the task-breakdown file first and use it as detailed execution context.
 4. Stay active and monitor progress.
 5. Review the completed work:
    - Check correctness and regressions
@@ -91,6 +93,11 @@ Use a brief like this for each subagent:
 
 ```md
 Implement Phase [N]: [title]
+
+Task breakdown path:
+- [path/to/task_breakdown.md]
+
+Read that file first. Use it as the detailed source of truth for the assigned tasks.
 
 Tasks in scope:
 - [task IDs or task titles]
