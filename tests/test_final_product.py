@@ -211,10 +211,17 @@ def test_final_product_summary_tracks_inventory_contract_and_pb_capabilities() -
     assert payload["figure_copy"]["subtitle"] == "2015-04-17T18:00:00 | selected band lower vs dominant lower"
     assert payload["figure_copy"]["annotation_title"] == "Decision card"
     assert payload["figure_copy"]["annotation_lines"][-1] == "Caveat: PB present; proxy-only."
-    assert "## Presentation inventory" in markdown
-    assert "## Presentation contract" in markdown
-    assert "PB present: presentation can acknowledge a future thermodynamic refinement path." in markdown
-    assert "presentation capabilities" in markdown
+    assert payload["report_copy"]["presentation_summary"].startswith("Mode selected: heuristic-severity.")
+    assert payload["report_copy"]["capability_note"] == "PB is present, so the report can point to a later thermodynamic refinement path."
+    assert payload["trace_copy"]["presentation_inventory"]["artifact_label"] == "final-product"
+    assert payload["trace_copy"]["presentation_contract"]["artifact_label"] == "final-product"
+    assert payload["trace_copy"]["presentation_capabilities"]["presentation_state"] == "pb-present"
+    assert "## Report copy" in markdown
+    assert "### Capability note" in markdown
+    assert "## Trace" in markdown
+    assert "Decision card" not in markdown
+    assert "Final product map - heuristic-severity" not in markdown
+    assert "PB is present, so the report can point to a later thermodynamic refinement path." in markdown
     assert phase5_product.has_risk is True
 
 
@@ -244,10 +251,18 @@ def test_highlighted_times_summary_tracks_inventory_contract_and_pb_absence() ->
     assert len(payload["figure_copy"]["annotation_lines"]) == 4
     assert payload["figure_copy"]["annotation_lines"][1].startswith("#1 ")
     assert all("selected as" not in line for line in payload["figure_copy"]["annotation_lines"])
+    assert payload["report_copy"]["selection_basis"].startswith("Auto-selection ranks")
+    assert payload["report_copy"]["capability_note"] == "PB is absent, so the report must keep the approximate proxy caveat explicit."
+    assert payload["trace_copy"]["highlighted_time_count"] == 3
+    assert payload["trace_copy"]["presentation_inventory"]["artifact_label"] == "highlighted-times"
+    assert payload["trace_copy"]["presentation_capabilities"]["presentation_state"] == "pb-absent"
     assert payload["source_metrics"]["time_display_labels"] == ["18:00", "19:00", "20:00", "21:00"]
-    assert "## Presentation inventory" in markdown
-    assert "## Presentation contract" in markdown
-    assert "PB absent: the presentation remains proxy-only." in markdown
+    assert "## Report copy" in markdown
+    assert "### Selection context" in markdown
+    assert "### Highlighted times" in markdown
+    assert "## Trace" in markdown
+    assert "Shortlist notes" not in markdown
+    assert "PB is absent, so the report must keep the approximate proxy caveat explicit." in markdown
 
 
 def test_highlighted_times_figure_uses_compact_labels_and_short_notes() -> None:
@@ -317,9 +332,12 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     markdown_text = markdown_path.read_text(encoding="utf-8")
     payload = json.loads(json_path.read_text(encoding="utf-8"))
 
-    assert "## Presentation summary" in markdown_text
-    assert "## Comparative summary" in markdown_text
-    assert "## Aircraft-oriented interpretation" in markdown_text
+    assert "## Report copy" in markdown_text
+    assert "### Presentation summary" in markdown_text
+    assert "### Comparative summary" in markdown_text
+    assert "### Aircraft-oriented interpretation" in markdown_text
+    assert "### Capability note" in markdown_text
+    assert "## Trace" in markdown_text
     assert "Artifact contract: `presentation/final-deliverable`" in markdown_text
     assert "Render view: `approximate-risk`" in markdown_text
     assert "Source phase: Phase 5" in markdown_text
@@ -331,6 +349,7 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "Approximate-risk is the binary Phase 5 proxy footprint" in markdown_text
     assert "not operational icing guidance" in markdown_text
     assert "phase5_markdown" in markdown_text
+    assert "Decision card" not in markdown_text
     assert payload["artifact_kind"] == "presentation/final-deliverable"
     assert payload["output_purpose"] == "presentation/final-deliverable"
     assert payload["delivery_mode"] == "canonical"
@@ -376,6 +395,8 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
     assert "map_geographic_context" in payload["contract"]["required_metadata_fields"]
     assert "outputs" in payload["contract"]["required_metadata_fields"]
     assert payload["contract"]["supported_views"] == ["approximate-risk", "heuristic-severity"]
+    assert payload["report_copy"]["presentation_summary"].startswith("Mode selected: approximate-risk.")
+    assert payload["trace_copy"]["presentation_inventory"]["artifact_label"] == "final-product"
     assert payload["presentation_summary"].startswith("Mode selected: approximate-risk.")
     assert "Delivery mode: entregable final canónico" in payload["presentation_summary"]
     assert "Rendered band: upper" in payload["presentation_summary"]
@@ -585,6 +606,10 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     final_markdown_text = final_markdown[0].read_text(encoding="utf-8")
     final_payload = json.loads(final_json[0].read_text(encoding="utf-8"))
 
+    assert "## Report copy" in final_markdown_text
+    assert "### Presentation summary" in final_markdown_text
+    assert "### Comparative summary" in final_markdown_text
+    assert "### Aircraft-oriented interpretation" in final_markdown_text
     assert "Artifact contract: `presentation/final-product`" in final_markdown_text
     assert "Delivery mode: `legacy`" in final_markdown_text
     assert "Delivery label: producto final heredado" in final_markdown_text
@@ -593,9 +618,7 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert "Selected band request: upper" in final_markdown_text
     assert "Selected band: upper" in final_markdown_text
     assert "Selected band signal status: empty" in final_markdown_text
-    assert "## Presentation summary" in final_markdown_text
-    assert "## Comparative summary" in final_markdown_text
-    assert "## Aircraft-oriented interpretation" in final_markdown_text
+    assert "## Trace" in final_markdown_text
     assert "phase6_markdown" in final_markdown_text
     assert "Cartopy PlateCarree map" in final_markdown_text
     assert "png" in final_markdown_text
@@ -617,6 +640,8 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["presentation_summary"].startswith("Mode selected: heuristic-severity.")
     assert "Delivery mode: producto final heredado" in final_payload["presentation_summary"]
     assert "severity moderate" in final_payload["presentation_summary"]
+    assert final_payload["report_copy"]["capability_note"].startswith("PB state unknown")
+    assert final_payload["trace_copy"]["presentation_inventory"]["artifact_label"] == "final-product"
     assert "Heuristic-severity adds a graded, band-conditioned score" in final_payload["comparative_summary"]
     assert "not operational icing guidance" in final_payload["aircraft_interpretation"]
     assert final_payload["contract"]["output_prefix"] == "presentation_final_product"
@@ -680,6 +705,8 @@ def test_highlighted_times_summary_explicit_selection_exports_traceable_metadata
         "selected from the user-requested highlighted-time list",
     ]
     assert len(payload["highlighted_times"]) == 2
+    assert payload["report_copy"]["selection_basis"].startswith("User-requested highlighted times")
+    assert payload["trace_copy"]["highlighted_time_count"] == 2
     assert payload["figure_copy"]["title"] == "Highlighted times - explicit"
     assert len(payload["figure_copy"]["annotation_lines"]) == 3
     assert all("selected from" not in line for line in payload["figure_copy"]["annotation_lines"])
@@ -692,6 +719,10 @@ def test_highlighted_times_summary_explicit_selection_exports_traceable_metadata
     assert payload["outputs"]["png"].endswith(".png")
     assert payload["source_metrics"]["selection_mode"] == "explicit"
     assert payload["source_metrics"]["selection_basis"].startswith("User-requested highlighted times")
+    assert "## Report copy" in markdown_text
+    assert "### Selection context" in markdown_text
+    assert "### Highlighted times" in markdown_text
+    assert "## Trace" in markdown_text
 
 
 def test_highlighted_times_summary_auto_selection_is_reproducible(tmp_path: Path) -> None:
@@ -726,6 +757,8 @@ def test_highlighted_times_summary_auto_selection_is_reproducible(tmp_path: Path
     assert "severity peak" in markdown_text or "maximum heuristic-severity score" in markdown_text
     assert payload["selection_mode"] == "auto"
     assert payload["highlighted_time_count"] == 3
+    assert payload["report_copy"]["selection_basis"].startswith("Auto-selection ranks")
+    assert payload["trace_copy"]["highlighted_time_count"] == 3
     assert payload["highlighted_time_indices"] == _expected_auto_highlighted_indices(payload, 3)
     assert len(payload["highlighted_times"]) == 3
     assert payload["highlighted_times"][0]["rank"] == 1
@@ -739,6 +772,9 @@ def test_highlighted_times_summary_auto_selection_is_reproducible(tmp_path: Path
     assert "comparison_mode" in payload["contract"]["required_metadata_fields"]
     assert payload["source_metrics"]["peak_severity_time_index"] == int(np.argmax(np.asarray(payload["source_metrics"]["time_severity_score"], dtype=np.float32)))
     assert payload["source_metrics"]["selection_mode"] == "auto"
+    assert "## Report copy" in markdown_text
+    assert "### Selection context" in markdown_text
+    assert "### Highlighted times" in markdown_text
 
 
 def test_main_writes_highlighted_times_artifacts_when_requested(tmp_path: Path, monkeypatch) -> None:
@@ -792,8 +828,11 @@ def test_main_writes_highlighted_times_artifacts_when_requested(tmp_path: Path, 
     highlighted_payload = json.loads(highlighted_json[0].read_text(encoding="utf-8"))
 
     assert "Selection mode: auto" in highlighted_markdown_text
-    assert "## Highlighted times" in highlighted_markdown_text
+    assert "## Report copy" in highlighted_markdown_text
+    assert "### Selection context" in highlighted_markdown_text
+    assert "### Highlighted times" in highlighted_markdown_text
     assert highlighted_payload["comparison_mode"] == "highlighted-times"
     assert highlighted_payload["selection_mode"] == "auto"
     assert highlighted_payload["highlighted_time_count"] == 3
+    assert highlighted_payload["trace_copy"]["highlighted_time_count"] == 3
     assert highlighted_payload["outputs"]["png"].endswith(".png")

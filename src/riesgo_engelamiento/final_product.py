@@ -284,6 +284,12 @@ def _final_product_figure_caveat(capabilities: DatasetPresentationCapabilities |
     return "PB absent; proxy-only."
 
 
+def _presentation_capability_report_note(capabilities: DatasetPresentationCapabilities | None) -> str:
+    if capabilities is None:
+        return "PB state unknown; the report keeps the proxy caveat explicit."
+    return capabilities.report_note
+
+
 @dataclass(frozen=True, slots=True)
 class FinalProductArtifactContract:
     artifact_kind: str = FINAL_PRODUCT_OUTPUT_PURPOSE
@@ -375,6 +381,8 @@ class FinalProductSummary:
             "comparative_summary": self.comparative_summary_text(),
             "aircraft_interpretation": self.aircraft_interpretation_text(),
             "figure_copy": self.figure_copy().to_dict(),
+            "report_copy": self.report_copy_payload(),
+            "trace_copy": self.trace_copy_payload(output_paths),
             "presentation_inventory": self.presentation_inventory.to_dict(),
             "presentation_contract": self.editorial_contract.to_dict(),
             "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
@@ -390,6 +398,28 @@ class FinalProductSummary:
     def figure_copy(self) -> FinalProductFigureCopy:
         return build_final_product_figure_copy(self)
 
+    def report_copy_payload(self) -> dict[str, Any]:
+        return {
+            "presentation_summary": self.presentation_summary_text(),
+            "comparative_summary": self.comparative_summary_text(),
+            "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "capability_note": _presentation_capability_report_note(self.presentation_capabilities),
+        }
+
+    def trace_copy_payload(self, output_paths: dict[str, Path] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "presentation_inventory": self.presentation_inventory.to_dict(),
+            "presentation_contract": self.editorial_contract.to_dict(),
+            "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
+            "caveat_labels": list(self.caveat_labels),
+            "contract": self.contract.to_dict(),
+            "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
+            "source_metrics": self.source_metrics,
+        }
+        if output_paths is not None:
+            payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
+        return payload
+
     def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
         def _format_value(value: Any) -> str:
             if isinstance(value, Path):
@@ -402,35 +432,29 @@ class FinalProductSummary:
                 return "unknown"
             return str(value)
 
+        report_copy = self.report_copy_payload()
+        trace_copy = self.trace_copy_payload(output_paths)
         lines = [
             f"# {self.delivery_label.title()}",
             "",
             f"Modo de entrega: {self.delivery_label}.",
             "",
-            "## Presentation summary",
-            self.presentation_summary_text(),
+            "Markdown carries the extended report copy; the PNG keeps only the short figure copy.",
             "",
-            "## Comparative summary",
-            self.comparative_summary_text(),
+            "## Report copy",
+            "### Presentation summary",
+            report_copy["presentation_summary"],
             "",
-            "## Aircraft-oriented interpretation",
-            self.aircraft_interpretation_text(),
+            "### Comparative summary",
+            report_copy["comparative_summary"],
             "",
-            "## Presentation inventory",
-            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
-            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
-            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
-            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
-            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "### Aircraft-oriented interpretation",
+            report_copy["aircraft_interpretation"],
             "",
-            "## Presentation contract",
-            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
-            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
-            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
-            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
-            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
-            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "### Capability note",
+            report_copy["capability_note"],
             "",
+            "## Trace",
             f"- Artifact contract: `{self.contract.artifact_kind}`",
             f"- Output purpose: `{self.output_purpose}`",
             f"- Delivery mode: `{self.delivery_mode}`",
@@ -457,24 +481,40 @@ class FinalProductSummary:
             f"- Dataset: `{self.dataset_path}`",
             f"- selected_time_index: {self.time_index}",
             f"- selected_time_label: {self.time_label or 'unknown'}",
-            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
             f"- Caveats: {', '.join(self.caveat_labels)}",
             "",
-            "## Contract",
+            "### Presentation inventory",
+            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
+            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
+            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
+            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
+            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "",
+            "### Presentation contract",
+            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
+            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
+            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
+            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
+            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
+            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "",
+            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
+            "",
+            "### Contract",
             f"- Output prefix: `{self.contract.output_prefix}`",
             f"- Supported views: {', '.join(self.contract.supported_views)}",
             f"- Required metadata fields: {', '.join(self.contract.required_metadata_fields)}",
             "",
-            "## Source artifacts",
+            "### Source artifacts",
         ]
         if self.source_artifacts:
             for name, path in self.source_artifacts.items():
                 lines.append(f"- {name}: `{path}`")
         else:
             lines.append("- none")
-        lines.extend(["", "## Source metrics"])
-        if self.source_metrics:
-            for name, value in self.source_metrics.items():
+        lines.extend(["", "### Source metrics"])
+        if trace_copy.get("source_metrics"):
+            for name, value in trace_copy["source_metrics"].items():
                 lines.append(f"- {name}: {_format_value(value)}")
         else:
             lines.append("- none")
@@ -1284,6 +1324,8 @@ class HighlightedTimeComparisonSummary:
             "presentation_summary": self.presentation_summary_text(),
             "comparative_summary": self.comparative_summary_text(),
             "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "report_copy": self.report_copy_payload(),
+            "trace_copy": self.trace_copy_payload(output_paths),
             "presentation_inventory": self.presentation_inventory.to_dict(),
             "presentation_contract": self.editorial_contract.to_dict(),
             "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
@@ -1298,6 +1340,46 @@ class HighlightedTimeComparisonSummary:
 
     def figure_copy(self) -> FinalProductFigureCopy:
         return build_highlighted_times_figure_copy(self)
+
+    def report_copy_payload(self) -> dict[str, Any]:
+        return {
+            "presentation_summary": self.presentation_summary_text(),
+            "comparative_summary": self.comparative_summary_text(),
+            "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "capability_note": _presentation_capability_report_note(self.presentation_capabilities),
+            "selection_basis": self.selection_basis,
+            "highlighted_times": [
+                {
+                    "rank": record.rank,
+                    "time_label": record.time_label or f"t{record.time_index:03d}",
+                    "selection_rule": record.selection_rule,
+                    "severity_score": record.severity_score,
+                    "severity_class": record.severity_class,
+                    "persistence_fraction": record.persistence_fraction,
+                    "risk_horizontal_fraction": record.risk_horizontal_fraction,
+                }
+                for record in self.highlighted_times
+            ],
+        }
+
+    def trace_copy_payload(self, output_paths: dict[str, Path] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "presentation_inventory": self.presentation_inventory.to_dict(),
+            "presentation_contract": self.editorial_contract.to_dict(),
+            "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
+            "caveat_labels": list(self.caveat_labels),
+            "contract": self.contract.to_dict(),
+            "highlighted_time_count": len(self.highlighted_times),
+            "highlighted_time_indices": [record.time_index for record in self.highlighted_times],
+            "highlighted_time_labels": [record.time_label for record in self.highlighted_times],
+            "highlighted_time_reasons": [record.selection_reason for record in self.highlighted_times],
+            "highlighted_times": [record.to_dict() for record in self.highlighted_times],
+            "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
+            "source_metrics": self.source_metrics,
+        }
+        if output_paths is not None:
+            payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
+        return payload
 
     def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
         def _format_value(value: Any) -> str:
@@ -1319,6 +1401,8 @@ class HighlightedTimeComparisonSummary:
                 lines.append("| " + " | ".join(row) + " |")
             return "\n".join(lines)
 
+        report_copy = self.report_copy_payload()
+        trace_copy = self.trace_copy_payload(output_paths)
         highlight_rows = [
             [
                 str(record.rank),
@@ -1336,47 +1420,25 @@ class HighlightedTimeComparisonSummary:
         lines = [
             "# Producto final de tiempos destacados",
             "",
-            "## Presentation summary",
-            self.presentation_summary_text(),
+            "Markdown carries the extended report copy; the PNG keeps only short shortlist labels.",
             "",
-            "## Comparative summary",
-            self.comparative_summary_text(),
+            "## Report copy",
+            "### Presentation summary",
+            report_copy["presentation_summary"],
             "",
-            "## Aircraft-oriented interpretation",
-            self.aircraft_interpretation_text(),
+            "### Comparative summary",
+            report_copy["comparative_summary"],
             "",
-            "## Presentation inventory",
-            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
-            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
-            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
-            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
-            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "### Aircraft-oriented interpretation",
+            report_copy["aircraft_interpretation"],
             "",
-            "## Presentation contract",
-            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
-            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
-            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
-            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
-            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
-            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "### Capability note",
+            report_copy["capability_note"],
             "",
-            f"- Artifact contract: `{self.contract.artifact_kind}`",
-            f"- Output purpose: `{self.output_purpose}`",
-            f"- Comparison mode: `{self.comparison_mode}`",
-            f"- Source mode: `{self.source_mode}`",
-            f"- Source phase: Phase {self.source_phase} ({self.source_phase_label})",
-            f"- Source product kind: {self.source_product_kind}",
-            f"- Reference time index: {self.reference_time_index}",
-            f"- Reference time label: {self.reference_time_label or 'unknown'}",
-            f"- Selection mode: {self.selection_mode}",
-            f"- Selection basis: {self.selection_basis}",
-            f"- Highlighted time count: {len(self.highlighted_times)}",
-            f"- Highlighted time indices: {', '.join(str(record.time_index) for record in self.highlighted_times)}",
-            f"- Highlighted time labels: {', '.join(record.time_label or 'unknown' for record in self.highlighted_times)}",
-            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
-            f"- Caveats: {', '.join(self.caveat_labels)}",
+            "### Selection context",
+            report_copy["selection_basis"],
             "",
-            "## Highlighted times",
+            "### Highlighted times",
             _table(
                 [
                     "Rank",
@@ -1391,21 +1453,54 @@ class HighlightedTimeComparisonSummary:
                 highlight_rows,
             ),
             "",
-            "## Contract",
+            "## Trace",
+            f"- Artifact contract: `{self.contract.artifact_kind}`",
+            f"- Output purpose: `{self.output_purpose}`",
+            f"- Comparison mode: `{self.comparison_mode}`",
+            f"- Source mode: `{self.source_mode}`",
+            f"- Source phase: Phase {self.source_phase} ({self.source_phase_label})",
+            f"- Source product kind: {self.source_product_kind}",
+            f"- Reference time index: {self.reference_time_index}",
+            f"- Reference time label: {self.reference_time_label or 'unknown'}",
+            f"- Selection mode: {self.selection_mode}",
+            f"- Selection basis: {self.selection_basis}",
+            f"- Highlighted time count: {len(self.highlighted_times)}",
+            f"- Highlighted time indices: {', '.join(str(record.time_index) for record in self.highlighted_times)}",
+            f"- Highlighted time labels: {', '.join(record.time_label or 'unknown' for record in self.highlighted_times)}",
+            f"- Caveats: {', '.join(self.caveat_labels)}",
+            "",
+            "### Presentation inventory",
+            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
+            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
+            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
+            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
+            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "",
+            "### Presentation contract",
+            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
+            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
+            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
+            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
+            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
+            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "",
+            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
+            "",
+            "### Contract",
             f"- Output prefix: `{self.contract.output_prefix}`",
             f"- Selection modes: {', '.join(self.contract.selection_modes)}",
             f"- Required metadata fields: {', '.join(self.contract.required_metadata_fields)}",
             "",
-            "## Source artifacts",
+            "### Source artifacts",
         ]
         if self.source_artifacts:
             for name, path in self.source_artifacts.items():
                 lines.append(f"- {name}: `{path}`")
         else:
             lines.append("- none")
-        lines.extend(["", "## Source metrics"])
-        if self.source_metrics:
-            for name, value in self.source_metrics.items():
+        lines.extend(["", "### Source metrics"])
+        if trace_copy.get("source_metrics"):
+            for name, value in trace_copy["source_metrics"].items():
                 lines.append(f"- {name}: {_format_value(value)}")
         else:
             lines.append("- none")

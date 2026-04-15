@@ -94,6 +94,12 @@ Align the Markdown and JSON artifacts with the new editorial split so the inform
 - [ ] The output family is coherent: the PNG summarizes, the Markdown explains, and the JSON traces.
 - [ ] Automatic truncation or summary rules prevent figure text from growing back into report-sized content.
 
+### Phase 4 implementation notes
+
+- Markdown now uses a dedicated `report_copy` layer with the extended summary, comparative context, aircraft interpretation, and capability note.
+- JSON now exposes a dedicated `trace_copy` layer with the inventory, contract, capability snapshot, source artifacts, source metrics, and outputs needed for reproducibility.
+- The figure copy remains short and presentation-oriented, so the PNG no longer depends on report-sized rationale blocks.
+
 ---
 
 ## Phase 5: Regression Coverage And Demo Validation
