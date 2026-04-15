@@ -33,6 +33,7 @@ from .presentation_map import (
     DEFAULT_FINAL_PRODUCT_MAP_STYLE,
     create_final_product_canvas,
     render_annotation_panel,
+    render_compact_annotation_card,
     render_binary_geographic_map,
     render_scalar_geographic_map,
 )
@@ -52,6 +53,235 @@ def _delivery_profile(delivery_mode: str) -> tuple[str, str, str]:
             "producto final heredado",
         )
     raise ValueError(f"Unsupported final-product delivery mode: {delivery_mode}")
+
+
+@dataclass(frozen=True, slots=True)
+class PresentationCopyInventory:
+    artifact_label: str
+    figure_copy: tuple[str, ...]
+    report_copy: tuple[str, ...]
+    trace_copy: tuple[str, ...]
+    saturation_notes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifact_label": self.artifact_label,
+            "figure_copy": list(self.figure_copy),
+            "report_copy": list(self.report_copy),
+            "trace_copy": list(self.trace_copy),
+            "saturation_notes": list(self.saturation_notes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PresentationEditorialContract:
+    artifact_label: str
+    figure_copy_budget: tuple[str, ...]
+    report_copy_budget: tuple[str, ...]
+    trace_copy_budget: tuple[str, ...]
+    figure_prohibited: tuple[str, ...]
+    subtitle_policy: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifact_label": self.artifact_label,
+            "figure_copy_budget": list(self.figure_copy_budget),
+            "report_copy_budget": list(self.report_copy_budget),
+            "trace_copy_budget": list(self.trace_copy_budget),
+            "figure_prohibited": list(self.figure_prohibited),
+            "subtitle_policy": self.subtitle_policy,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FinalProductFigureCopy:
+    title: str
+    subtitle: str
+    annotation_title: str
+    annotation_lines: tuple[str, ...]
+    footer: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "annotation_title": self.annotation_title,
+            "annotation_lines": list(self.annotation_lines),
+            "footer": self.footer,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetPresentationCapabilities:
+    has_pb: bool
+    pb_state: str
+    presentation_state: str
+    figure_note: str
+    report_note: str
+    trace_note: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "has_pb": self.has_pb,
+            "pb_state": self.pb_state,
+            "presentation_state": self.presentation_state,
+            "figure_note": self.figure_note,
+            "report_note": self.report_note,
+            "trace_note": self.trace_note,
+        }
+
+
+FINAL_PRODUCT_PRESENTATION_INVENTORY = PresentationCopyInventory(
+    artifact_label="final-product",
+    figure_copy=(
+        "title and subtitle",
+        "map panel",
+        "compact annotation card",
+        "short caveat labels",
+    ),
+    report_copy=(
+        "presentation summary",
+        "comparative summary",
+        "aircraft-oriented interpretation",
+        "presentation inventory",
+        "presentation contract",
+        "presentation capabilities",
+    ),
+    trace_copy=(
+        "artifact contract",
+        "selected band metadata",
+        "source artifacts",
+        "source metrics",
+        "outputs",
+    ),
+    saturation_notes=(
+        "the current annotation card still mirrors report prose more than figure copy should",
+        "source metrics remain trace-heavy and belong outside the PNG",
+        "the figure should stop inheriting long selection or caveat paragraphs",
+    ),
+)
+
+HIGHLIGHTED_TIMES_PRESENTATION_INVENTORY = PresentationCopyInventory(
+    artifact_label="highlighted-times",
+    figure_copy=(
+        "title and subtitle",
+        "temporal series plot",
+        "shortlist comparison bars",
+        "selection notes card",
+    ),
+    report_copy=(
+        "presentation summary",
+        "comparative summary",
+        "aircraft-oriented interpretation",
+        "highlighted-time table",
+        "presentation inventory",
+        "presentation contract",
+        "presentation capabilities",
+    ),
+    trace_copy=(
+        "artifact contract",
+        "selection mode and basis",
+        "highlighted_times records",
+        "source artifacts",
+        "source metrics",
+        "outputs",
+    ),
+    saturation_notes=(
+        "selection reasons are still longer than figure copy should tolerate",
+        "time labels in the PNG still use long ISO strings",
+        "the JSON trace intentionally keeps the full shortlist rationale",
+    ),
+)
+
+FINAL_PRODUCT_PRESENTATION_CONTRACT = PresentationEditorialContract(
+    artifact_label="final-product",
+    figure_copy_budget=(
+        "one short title",
+        "one short subtitle",
+        "one compact annotation card",
+        "dataset-aware caveats only as short labels",
+    ),
+    report_copy_budget=(
+        "expanded presentation summary",
+        "comparative summary",
+        "aircraft-oriented interpretation",
+        "inventory of content tiers",
+        "dataset capability note",
+    ),
+    trace_copy_budget=(
+        "artifact contract",
+        "source artifacts",
+        "source metrics",
+        "outputs",
+    ),
+    figure_prohibited=(
+        "full metric dumps",
+        "long selection rationales",
+        "duplicate report paragraphs",
+        "raw JSON payload text",
+    ),
+    subtitle_policy="keep the subtitle to one sentence and let the report carry the explanation",
+)
+
+HIGHLIGHTED_TIMES_PRESENTATION_CONTRACT = PresentationEditorialContract(
+    artifact_label="highlighted-times",
+    figure_copy_budget=(
+        "one short title",
+        "one short subtitle",
+        "one compact shortlist card",
+        "short labels for highlighted times",
+    ),
+    report_copy_budget=(
+        "expanded presentation summary",
+        "comparative summary",
+        "aircraft-oriented interpretation",
+        "highlighted-time table",
+        "inventory of content tiers",
+        "dataset capability note",
+    ),
+    trace_copy_budget=(
+        "artifact contract",
+        "source artifacts",
+        "source metrics",
+        "outputs",
+    ),
+    figure_prohibited=(
+        "paragraph-style selection reasons",
+        "full selection tables inside the PNG",
+        "duplicate report paragraphs",
+        "raw JSON payload text",
+    ),
+    subtitle_policy="keep the subtitle to one sentence and move selection rationale into the report",
+)
+
+
+def detect_dataset_presentation_capabilities(dataset: xr.Dataset) -> DatasetPresentationCapabilities:
+    has_pb = "PB" in dataset
+    if has_pb:
+        return DatasetPresentationCapabilities(
+            has_pb=True,
+            pb_state="present",
+            presentation_state="pb-present",
+            figure_note="PB present: presentation can acknowledge a future thermodynamic refinement path.",
+            report_note="PB is present, so the report can point to a later thermodynamic refinement path.",
+            trace_note="PB field present in the dataset.",
+        )
+    return DatasetPresentationCapabilities(
+        has_pb=False,
+        pb_state="absent",
+        presentation_state="pb-absent",
+        figure_note="PB absent: the presentation remains proxy-only.",
+        report_note="PB is absent, so the report must keep the approximate proxy caveat explicit.",
+        trace_note="PB field absent in the dataset.",
+    )
+
+
+def _final_product_figure_caveat(capabilities: DatasetPresentationCapabilities | None) -> str:
+    if capabilities is None:
+        return "PB state unknown; proxy-only."
+    if capabilities.has_pb:
+        return "PB present; proxy-only."
+    return "PB absent; proxy-only."
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +335,9 @@ class FinalProductSummary:
     band_relation: str = "no dominant band detected"
     output_purpose: str = FINAL_PRODUCT_OUTPUT_PURPOSE
     contract: FinalProductArtifactContract = field(default_factory=FinalProductArtifactContract)
+    presentation_inventory: PresentationCopyInventory = field(default_factory=lambda: FINAL_PRODUCT_PRESENTATION_INVENTORY)
+    editorial_contract: PresentationEditorialContract = field(default_factory=lambda: FINAL_PRODUCT_PRESENTATION_CONTRACT)
+    presentation_capabilities: DatasetPresentationCapabilities | None = None
     caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
     source_artifacts: dict[str, Path] = field(default_factory=dict)
     source_metrics: dict[str, Any] = field(default_factory=dict)
@@ -141,6 +374,10 @@ class FinalProductSummary:
             "presentation_summary": self.presentation_summary_text(),
             "comparative_summary": self.comparative_summary_text(),
             "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "figure_copy": self.figure_copy().to_dict(),
+            "presentation_inventory": self.presentation_inventory.to_dict(),
+            "presentation_contract": self.editorial_contract.to_dict(),
+            "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
             "caveat_labels": list(self.caveat_labels),
             "contract": self.contract.to_dict(),
             "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
@@ -149,6 +386,9 @@ class FinalProductSummary:
         if output_paths is not None:
             payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
         return payload
+
+    def figure_copy(self) -> FinalProductFigureCopy:
+        return build_final_product_figure_copy(self)
 
     def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
         def _format_value(value: Any) -> str:
@@ -176,6 +416,21 @@ class FinalProductSummary:
             "## Aircraft-oriented interpretation",
             self.aircraft_interpretation_text(),
             "",
+            "## Presentation inventory",
+            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
+            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
+            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
+            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
+            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "",
+            "## Presentation contract",
+            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
+            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
+            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
+            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
+            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
+            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "",
             f"- Artifact contract: `{self.contract.artifact_kind}`",
             f"- Output purpose: `{self.output_purpose}`",
             f"- Delivery mode: `{self.delivery_mode}`",
@@ -202,6 +457,7 @@ class FinalProductSummary:
             f"- Dataset: `{self.dataset_path}`",
             f"- selected_time_index: {self.time_index}",
             f"- selected_time_label: {self.time_label or 'unknown'}",
+            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
             f"- Caveats: {', '.join(self.caveat_labels)}",
             "",
             "## Contract",
@@ -301,6 +557,53 @@ def _coerce_source_artifacts(source_artifacts: Mapping[str, Path] | None) -> dic
     if not source_artifacts:
         return {}
     return {name: Path(path) for name, path in source_artifacts.items()}
+
+
+def build_final_product_figure_copy(summary: FinalProductSummary) -> FinalProductFigureCopy:
+    time_label = summary.time_label or f"t{summary.time_index:03d}"
+    caveat = _final_product_figure_caveat(summary.presentation_capabilities)
+    if summary.render_view == "approximate-risk":
+        selected_band_horizontal_fraction = summary.source_metrics.get("selected_band_horizontal_fraction")
+        risk_horizontal_fraction = summary.source_metrics.get("risk_horizontal_fraction")
+        coverage_parts: list[str] = []
+        if selected_band_horizontal_fraction is not None:
+            coverage_parts.append(f"band {float(selected_band_horizontal_fraction):.1%}")
+        if risk_horizontal_fraction is not None:
+            coverage_parts.append(f"domain {float(risk_horizontal_fraction):.1%}")
+        coverage_text = "; ".join(coverage_parts) if coverage_parts else "coverage unavailable"
+        return FinalProductFigureCopy(
+            title="Final product map - approximate-risk",
+            subtitle=f"{time_label} | selected band {summary.selected_band} vs dominant {summary.dominant_band}",
+            annotation_title="Decision card",
+            annotation_lines=(
+                f"Time: {time_label}",
+                f"Band: {summary.selected_band} vs dominant {summary.dominant_band}",
+                f"Coverage: {coverage_text}",
+                f"Caveat: {caveat}",
+            ),
+            footer="Compact figure copy; extended notes remain in Markdown.",
+        )
+
+    severity_class = summary.source_metrics.get("severity_class") or "unknown"
+    severity_score = summary.source_metrics.get("severity_score")
+    mean_risk_fraction = summary.source_metrics.get("selected_band_mean_risk_fraction")
+    severity_text = f"{severity_class}"
+    if severity_score is not None:
+        severity_text = f"{severity_class} ({float(severity_score):.1f}/100)"
+    if mean_risk_fraction is not None:
+        severity_text = f"{severity_text}; mean risk {float(mean_risk_fraction):.1%}"
+    return FinalProductFigureCopy(
+        title="Final product map - heuristic-severity",
+        subtitle=f"{time_label} | selected band {summary.selected_band} vs dominant {summary.dominant_band}",
+        annotation_title="Decision card",
+        annotation_lines=(
+            f"Time: {time_label}",
+            f"Band: {summary.selected_band} vs dominant {summary.dominant_band}",
+            f"Severity: {severity_text}",
+            f"Caveat: {caveat}",
+        ),
+        footer="Compact figure copy; extended notes remain in Markdown.",
+    )
 
 
 def _band_lookup(product: Phase6HeuristicSeverityProduct) -> dict[str, Any]:
@@ -651,26 +954,19 @@ def build_final_product_figure(
     if summary.render_view == "heuristic-severity" and source_dataset is None:
         raise ValueError("heuristic-severity final products require the source dataset to build the spatial score.")
 
+    figure_copy = summary.figure_copy()
     fig, map_ax, annotation_ax = create_final_product_canvas(style)
     lon = risk_product.risk_presence.coords.get("XLONG")
     lat = risk_product.risk_presence.coords.get("XLAT")
     if summary.render_view == "approximate-risk":
         risk_field, band_stats = _build_band_conditioned_risk_field(risk_product, summary.selected_band)
-        title = f"Presentation map - approximate-risk footprint ({summary.selected_band} band)"
+        title = figure_copy.title
         legend_title = f"Approximate-risk footprint ({summary.selected_band} band)"
-        subtitle_parts = [
-            f"Time {summary.time_index}",
-            summary.time_label or "unknown time",
-            f"Selected band {summary.selected_band}",
-            f"Dominant {summary.dominant_band}",
-            f"Source phase {summary.source_phase}",
-            f"Resolution {summary.selected_band_resolution}",
-        ]
         render_binary_geographic_map(
             map_ax,
             risk_field.values,
             title=title,
-            subtitle=" | ".join(subtitle_parts),
+            subtitle=figure_copy.subtitle,
             lon=lon.values if lon is not None else None,
             lat=lat.values if lat is not None else None,
             legend_title=legend_title,
@@ -685,20 +981,12 @@ def build_final_product_figure(
             risk_product,
             summary.selected_band,
         )
-        title = f"Presentation map - band-conditioned spatial heuristic severity score ({summary.selected_band} band)"
-        subtitle_parts = [
-            f"Time {summary.time_index}",
-            summary.time_label or "unknown time",
-            f"Selected band {summary.selected_band}",
-            f"Dominant {summary.dominant_band}",
-            f"Source phase {summary.source_phase}",
-            f"Severity {severity_product.severity_class} ({severity_product.severity_score:.1f}/100)",
-        ]
+        title = figure_copy.title
         render_scalar_geographic_map(
             map_ax,
             spatial_severity_field.values,
             title=title,
-            subtitle=" | ".join(subtitle_parts),
+            subtitle=figure_copy.subtitle,
             lon=lon.values if lon is not None else None,
             lat=lat.values if lat is not None else None,
             cbar_label="Band-conditioned heuristic severity score (0-100)",
@@ -707,24 +995,17 @@ def build_final_product_figure(
             contour_levels=(20.0, 40.0, 60.0, 80.0),
             style=style,
         )
-    annotation_lines = _final_product_annotation_lines(
-        summary,
-        risk_product,
-        map_semantics=summary.map_semantics,
-        severity_product=severity_product,
-        spatial_severity_stats=spatial_severity_stats,
-    )
-    render_annotation_panel(
+    render_compact_annotation_card(
         annotation_ax,
-        "Final product annotations",
-        annotation_lines,
-        footer="Presentation artifact built from diagnostic proxy outputs.",
+        figure_copy.annotation_title,
+        figure_copy.annotation_lines,
+        footer=figure_copy.footer,
         style=style,
     )
     fig.suptitle(
-        f"Riesgo de engelamiento - {summary.delivery_label} ({summary.selected_band} band)",
+        f"Riesgo de engelamiento - {summary.delivery_label}",
         color=style.title_color,
-        fontsize=16,
+        fontsize=15,
         fontweight="bold",
     )
     return fig
@@ -739,6 +1020,7 @@ def build_final_product_summary(
     delivery_mode: str = "canonical",
     severity_product: Phase6HeuristicSeverityProduct | None = None,
     source_artifacts: Mapping[str, Path] | None = None,
+    presentation_capabilities: DatasetPresentationCapabilities | None = None,
 ) -> FinalProductSummary:
     source_artifacts_map = _coerce_source_artifacts(source_artifacts)
     dataset_path = Path(dataset_path)
@@ -817,6 +1099,7 @@ def build_final_product_summary(
                 delivery_mode=delivery_mode,
                 delivery_label=delivery_label,
             ),
+            presentation_capabilities=presentation_capabilities,
             **band_metadata,
             source_artifacts=source_artifacts_map,
             source_metrics=source_metrics,
@@ -859,6 +1142,7 @@ def build_final_product_summary(
                 delivery_mode=delivery_mode,
                 delivery_label=delivery_label,
             ),
+            presentation_capabilities=presentation_capabilities,
             **band_metadata,
             source_artifacts=source_artifacts_map,
             source_metrics=source_metrics,
@@ -970,6 +1254,9 @@ class HighlightedTimeComparisonSummary:
     highlighted_times: tuple[HighlightedTimeRecord, ...]
     output_purpose: str = FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE
     contract: HighlightedTimeArtifactContract = field(default_factory=HighlightedTimeArtifactContract)
+    presentation_inventory: PresentationCopyInventory = field(default_factory=lambda: HIGHLIGHTED_TIMES_PRESENTATION_INVENTORY)
+    editorial_contract: PresentationEditorialContract = field(default_factory=lambda: HIGHLIGHTED_TIMES_PRESENTATION_CONTRACT)
+    presentation_capabilities: DatasetPresentationCapabilities | None = None
     caveat_labels: tuple[str, ...] = FINAL_PRODUCT_CAVEAT_LABELS
     source_artifacts: dict[str, Path] = field(default_factory=dict)
     source_metrics: dict[str, Any] = field(default_factory=dict)
@@ -996,6 +1283,9 @@ class HighlightedTimeComparisonSummary:
             "presentation_summary": self.presentation_summary_text(),
             "comparative_summary": self.comparative_summary_text(),
             "aircraft_interpretation": self.aircraft_interpretation_text(),
+            "presentation_inventory": self.presentation_inventory.to_dict(),
+            "presentation_contract": self.editorial_contract.to_dict(),
+            "presentation_capabilities": self.presentation_capabilities.to_dict() if self.presentation_capabilities else None,
             "caveat_labels": list(self.caveat_labels),
             "contract": self.contract.to_dict(),
             "source_artifacts": {name: str(path) for name, path in self.source_artifacts.items()},
@@ -1051,6 +1341,21 @@ class HighlightedTimeComparisonSummary:
             "## Aircraft-oriented interpretation",
             self.aircraft_interpretation_text(),
             "",
+            "## Presentation inventory",
+            f"- Artifact label: `{self.presentation_inventory.artifact_label}`",
+            f"- Figure copy: {', '.join(self.presentation_inventory.figure_copy)}",
+            f"- Report copy: {', '.join(self.presentation_inventory.report_copy)}",
+            f"- Trace copy: {', '.join(self.presentation_inventory.trace_copy)}",
+            f"- Saturation notes: {', '.join(self.presentation_inventory.saturation_notes) if self.presentation_inventory.saturation_notes else 'none'}",
+            "",
+            "## Presentation contract",
+            f"- Artifact label: `{self.editorial_contract.artifact_label}`",
+            f"- Figure copy budget: {', '.join(self.editorial_contract.figure_copy_budget)}",
+            f"- Report copy budget: {', '.join(self.editorial_contract.report_copy_budget)}",
+            f"- Trace copy budget: {', '.join(self.editorial_contract.trace_copy_budget)}",
+            f"- Figure prohibited: {', '.join(self.editorial_contract.figure_prohibited)}",
+            f"- Subtitle policy: {self.editorial_contract.subtitle_policy}",
+            "",
             f"- Artifact contract: `{self.contract.artifact_kind}`",
             f"- Output purpose: `{self.output_purpose}`",
             f"- Comparison mode: `{self.comparison_mode}`",
@@ -1064,6 +1369,7 @@ class HighlightedTimeComparisonSummary:
             f"- Highlighted time count: {len(self.highlighted_times)}",
             f"- Highlighted time indices: {', '.join(str(record.time_index) for record in self.highlighted_times)}",
             f"- Highlighted time labels: {', '.join(record.time_label or 'unknown' for record in self.highlighted_times)}",
+            f"- Presentation capabilities: {self.presentation_capabilities.to_dict() if self.presentation_capabilities else 'unknown'}",
             f"- Caveats: {', '.join(self.caveat_labels)}",
             "",
             "## Highlighted times",
@@ -1288,6 +1594,7 @@ def build_highlighted_times_summary(
     highlighted_times: Sequence[int] | None = None,
     highlighted_time_count: int = 3,
     source_artifacts: Mapping[str, Path] | None = None,
+    presentation_capabilities: DatasetPresentationCapabilities | None = None,
 ) -> HighlightedTimeComparisonSummary:
     dataset_path = Path(dataset_path)
     time_labels = _series_time_labels(source_product)
@@ -1362,6 +1669,7 @@ def build_highlighted_times_summary(
         selection_mode=selection_mode,
         selection_basis=selection_basis,
         highlighted_times=highlighted_records,
+        presentation_capabilities=presentation_capabilities,
         source_artifacts=_coerce_source_artifacts(source_artifacts),
         source_metrics=source_metrics,
     )

@@ -8,12 +8,17 @@ import xarray as xr
 
 from riesgo_engelamiento import cli
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
+from riesgo_engelamiento.final_product import detect_dataset_presentation_capabilities
 from riesgo_engelamiento.dataset import DatasetValidationError, assert_valid, validate_dataset
 from riesgo_engelamiento.phase2 import build_phase2_liquid_product
 from riesgo_engelamiento.summary import build_phase1_summary
 
 
-def _build_dataset(include_qrain: bool = True, include_bottom_top_stag: bool = True) -> xr.Dataset:
+def _build_dataset(
+    include_qrain: bool = True,
+    include_bottom_top_stag: bool = True,
+    include_pb: bool = False,
+) -> xr.Dataset:
     time = np.array(
         ["2015-04-17T18:00:00", "2015-04-17T21:00:00"],
         dtype="datetime64[ns]",
@@ -39,6 +44,8 @@ def _build_dataset(include_qrain: bool = True, include_bottom_top_stag: bool = T
         data_vars["QRAIN"] = (EXPECTED_DIMS_BY_VARIABLE["QRAIN"], field.copy())
     if include_bottom_top_stag:
         data_vars["ZNW"] = (EXPECTED_DIMS_BY_VARIABLE["ZNW"], vertical.copy())
+    if include_pb:
+        data_vars["PB"] = (EXPECTED_DIMS_BY_VARIABLE["P"], field.copy())
 
     return xr.Dataset(
         data_vars=data_vars,
@@ -104,6 +111,29 @@ def test_validate_dataset_accepts_complete_dataset() -> None:
     assert "T0 = 300 K" in summary.to_markdown()
     diagnostics = {diagnostic.name: diagnostic for diagnostic in summary.diagnostics}
     assert diagnostics["Phase 6 heuristic severity"].status == "available with caveats"
+
+
+@pytest.mark.parametrize(
+    ("include_pb", "expected_state"),
+    [
+        (True, "pb-present"),
+        (False, "pb-absent"),
+    ],
+)
+def test_dataset_presentation_capabilities_track_pb_presence(
+    include_pb: bool,
+    expected_state: str,
+) -> None:
+    dataset = _build_dataset(include_pb=include_pb)
+    capabilities = detect_dataset_presentation_capabilities(dataset)
+
+    assert capabilities.has_pb is include_pb
+    assert capabilities.presentation_state == expected_state
+    assert capabilities.pb_state == ("present" if include_pb else "absent")
+    if include_pb:
+        assert capabilities.report_note.startswith("PB is present")
+    else:
+        assert capabilities.report_note.startswith("PB is absent")
 
 
 def test_validate_dataset_reports_missing_inputs_and_raises_on_request() -> None:

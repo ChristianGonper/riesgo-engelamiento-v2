@@ -6,11 +6,13 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import cartopy.crs as ccrs
+import pytest
 import xarray as xr
 
 from riesgo_engelamiento import cli
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
 from riesgo_engelamiento.final_product import (
+    detect_dataset_presentation_capabilities,
     build_final_product_figure,
     build_final_product_summary,
     build_highlighted_times_summary,
@@ -21,7 +23,7 @@ from riesgo_engelamiento.phase5 import build_phase5_approximate_risk_product
 from riesgo_engelamiento.phase6 import build_phase6_heuristic_severity_product
 
 
-def _build_final_product_dataset() -> xr.Dataset:
+def _build_final_product_dataset(include_pb: bool = False) -> xr.Dataset:
     time = np.array(
         ["2015-04-17T18:00:00", "2015-04-17T21:00:00"],
         dtype="datetime64[ns]",
@@ -57,13 +59,14 @@ def _build_final_product_dataset() -> xr.Dataset:
             "ZNW": (EXPECTED_DIMS_BY_VARIABLE["ZNW"], vertical),
             "XLAT": (EXPECTED_DIMS_BY_VARIABLE["XLAT"], horizontal + 40.0),
             "XLONG": (EXPECTED_DIMS_BY_VARIABLE["XLONG"], horizontal - 3.0),
+            **({"PB": (EXPECTED_DIMS_BY_VARIABLE["P"], pressure + 1.0)} if include_pb else {}),
         },
         coords={"XTIME": (EXPECTED_DIMS_BY_VARIABLE["XTIME"], time)},
         attrs={"TITLE": "synthetic wrfout", "START_DATE": "2015-04-17_18:00:00"},
     )
 
 
-def _build_highlighted_times_dataset() -> xr.Dataset:
+def _build_highlighted_times_dataset(include_pb: bool = False) -> xr.Dataset:
     time = np.array(
         [
             "2015-04-17T18:00:00",
@@ -112,6 +115,7 @@ def _build_highlighted_times_dataset() -> xr.Dataset:
             "ZNW": (EXPECTED_DIMS_BY_VARIABLE["ZNW"], vertical),
             "XLAT": (EXPECTED_DIMS_BY_VARIABLE["XLAT"], horizontal + 40.0),
             "XLONG": (EXPECTED_DIMS_BY_VARIABLE["XLONG"], horizontal - 3.0),
+            **({"PB": (EXPECTED_DIMS_BY_VARIABLE["P"], pressure + 1.0)} if include_pb else {}),
         },
         coords={"XTIME": (EXPECTED_DIMS_BY_VARIABLE["XTIME"], time)},
         attrs={"TITLE": "synthetic wrfout", "START_DATE": "2015-04-17_18:00:00"},
@@ -153,6 +157,89 @@ def _expected_auto_highlighted_indices(payload: dict[str, object], count: int) -
         if len(selected) >= count:
             break
     return selected
+
+
+@pytest.mark.parametrize(
+    ("include_pb", "expected_state", "expected_note"),
+    [
+        (True, "pb-present", "PB present"),
+        (False, "pb-absent", "PB absent"),
+    ],
+)
+def test_dataset_presentation_capabilities_distinguish_pb_presence(
+    include_pb: bool,
+    expected_state: str,
+    expected_note: str,
+) -> None:
+    dataset = _build_final_product_dataset(include_pb=include_pb)
+    capabilities = detect_dataset_presentation_capabilities(dataset)
+
+    assert capabilities.has_pb is include_pb
+    assert capabilities.presentation_state == expected_state
+    assert capabilities.pb_state == ("present" if include_pb else "absent")
+    assert expected_note in capabilities.figure_note
+    if include_pb:
+        assert "PB is present" in capabilities.report_note
+    else:
+        assert "PB is absent" in capabilities.report_note
+
+
+def test_final_product_summary_tracks_inventory_contract_and_pb_capabilities() -> None:
+    dataset = _build_final_product_dataset(include_pb=True)
+    capabilities = detect_dataset_presentation_capabilities(dataset)
+    phase5_product = build_phase5_approximate_risk_product(dataset, "synthetic.nc", time_index=0)
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=0)
+    summary = build_final_product_summary(
+        phase6_product,
+        "synthetic.nc",
+        render_view="heuristic-severity",
+        selected_band="dominant",
+        severity_product=phase6_product,
+        presentation_capabilities=capabilities,
+    )
+    payload = summary.to_dict()
+    markdown = summary.to_markdown()
+
+    assert payload["presentation_inventory"]["artifact_label"] == "final-product"
+    assert "title and subtitle" in payload["presentation_inventory"]["figure_copy"]
+    assert payload["presentation_contract"]["artifact_label"] == "final-product"
+    assert "full metric dumps" in payload["presentation_contract"]["figure_prohibited"]
+    assert payload["presentation_capabilities"]["presentation_state"] == "pb-present"
+    assert payload["presentation_capabilities"]["has_pb"] is True
+    assert payload["figure_copy"]["title"] == "Final product map - heuristic-severity"
+    assert payload["figure_copy"]["subtitle"] == "2015-04-17T18:00:00 | selected band lower vs dominant lower"
+    assert payload["figure_copy"]["annotation_title"] == "Decision card"
+    assert payload["figure_copy"]["annotation_lines"][-1] == "Caveat: PB present; proxy-only."
+    assert "## Presentation inventory" in markdown
+    assert "## Presentation contract" in markdown
+    assert "PB present: presentation can acknowledge a future thermodynamic refinement path." in markdown
+    assert "presentation capabilities" in markdown
+    assert phase5_product.has_risk is True
+
+
+def test_highlighted_times_summary_tracks_inventory_contract_and_pb_absence() -> None:
+    dataset = _build_highlighted_times_dataset(include_pb=False)
+    capabilities = detect_dataset_presentation_capabilities(dataset)
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=1)
+    summary = build_highlighted_times_summary(
+        phase6_product,
+        "synthetic.nc",
+        source_mode="approximate-risk",
+        highlighted_time_count=3,
+        presentation_capabilities=capabilities,
+    )
+    payload = summary.to_dict()
+    markdown = summary.to_markdown()
+
+    assert payload["presentation_inventory"]["artifact_label"] == "highlighted-times"
+    assert "temporal series plot" in payload["presentation_inventory"]["figure_copy"]
+    assert payload["presentation_contract"]["artifact_label"] == "highlighted-times"
+    assert "paragraph-style selection reasons" in payload["presentation_contract"]["figure_prohibited"]
+    assert payload["presentation_capabilities"]["presentation_state"] == "pb-absent"
+    assert payload["presentation_capabilities"]["has_pb"] is False
+    assert "## Presentation inventory" in markdown
+    assert "## Presentation contract" in markdown
+    assert "PB absent: the presentation remains proxy-only." in markdown
 
 
 def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> None:
@@ -265,6 +352,7 @@ def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> No
 
 def test_final_product_figure_contains_self_contained_annotations() -> None:
     dataset = _build_final_product_dataset()
+    capabilities = detect_dataset_presentation_capabilities(dataset)
     phase5_product = build_phase5_approximate_risk_product(dataset, "synthetic.nc", time_index=0)
     phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=0)
     summary = build_final_product_summary(
@@ -273,6 +361,7 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         render_view="heuristic-severity",
         selected_band="dominant",
         severity_product=phase6_product,
+        presentation_capabilities=capabilities,
         source_artifacts={
             "phase5_markdown": Path("phase5.md"),
             "phase5_json": Path("phase5.json"),
@@ -290,6 +379,7 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         assert len(figure.axes) == 3
         map_axis, annotation_axis, colorbar_axis = figure.axes
         assert type(map_axis.projection).__name__ == "PlateCarree"
+        assert map_axis.get_position().width > annotation_axis.get_position().width
         feature_artists = [collection for collection in map_axis.collections if collection.__class__.__module__.startswith("cartopy.mpl.feature_artist")]
         assert len(feature_artists) >= 3
         extent = map_axis.get_extent(crs=ccrs.PlateCarree())
@@ -298,22 +388,46 @@ def test_final_product_figure_contains_self_contained_annotations() -> None:
         assert extent[0] < -3.0 < extent[1]
         assert extent[2] < 40.0 < extent[3]
         annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
-        assert "Final product annotations" in annotation_text
-        assert "Delivery mode: entregable final canónico" in annotation_text
-        assert "Presentation summary:" in annotation_text
-        assert "Comparative summary:" in annotation_text
-        assert "Aircraft-oriented interpretation:" in annotation_text
-        assert "heuristic-severity" in annotation_text
-        assert "Selected band: lower" in annotation_text
-        assert "Selected band resolution: dominant" in annotation_text
-        assert "Severity class" in annotation_text
-        assert "Dominant band (phase 6): lower" in annotation_text
-        assert "Band score range" in annotation_text
-        assert "Band score formula" in annotation_text
-        assert "Caveats" in annotation_text
+        assert "Decision card" in annotation_text
+        assert "Time: 2015-04-17T18:00:00" in annotation_text
+        assert "Band: lower vs dominant lower" in annotation_text
+        assert "Severity: moderate" in annotation_text
+        assert "Caveat: PB absent; proxy-only." in annotation_text
+        assert "Presentation summary:" not in annotation_text
+        assert "Comparative summary:" not in annotation_text
+        assert "Band score formula" not in annotation_text
         assert map_axis.get_legend() is None
-        assert "band-conditioned spatial heuristic severity score" in map_axis.get_title(loc="left")
+        assert map_axis.get_title(loc="left") == "Final product map - heuristic-severity"
         assert colorbar_axis.get_ylabel() == "Band-conditioned heuristic severity score (0-100)"
+    finally:
+        plt.close(figure)
+
+
+def test_final_product_figure_approximate_risk_preserves_short_copy_and_hierarchy() -> None:
+    dataset = _build_final_product_dataset(include_pb=True)
+    phase5_product = build_phase5_approximate_risk_product(dataset, "synthetic.nc", time_index=0)
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=0)
+    capabilities = detect_dataset_presentation_capabilities(dataset)
+    summary = build_final_product_summary(
+        phase5_product,
+        "synthetic.nc",
+        render_view="approximate-risk",
+        selected_band="upper",
+        severity_product=phase6_product,
+        presentation_capabilities=capabilities,
+    )
+
+    figure = build_final_product_figure(summary, phase5_product, phase6_product, dataset)
+    try:
+        assert len(figure.axes) == 2
+        map_axis, annotation_axis = figure.axes
+        assert map_axis.get_position().width > annotation_axis.get_position().width
+        annotation_text = "\n".join(text.get_text() for text in annotation_axis.texts)
+        assert "Decision card" in annotation_text
+        assert "Coverage:" in annotation_text
+        assert "Caveat: PB present; proxy-only." in annotation_text
+        assert "Presentation summary:" not in annotation_text
+        assert map_axis.get_title(loc="left") == "Final product map - approximate-risk"
     finally:
         plt.close(figure)
 

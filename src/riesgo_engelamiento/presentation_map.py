@@ -9,6 +9,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.colors import Normalize
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import FancyBboxPatch
 from matplotlib.patches import Patch
 from matplotlib.ticker import MaxNLocator
 
@@ -58,7 +59,7 @@ def create_final_product_canvas(
     style: FinalProductMapStyle = DEFAULT_FINAL_PRODUCT_MAP_STYLE,
 ) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
     fig = plt.figure(figsize=style.figure_size, dpi=style.dpi, facecolor=style.figure_facecolor, constrained_layout=True)
-    grid = fig.add_gridspec(1, 2, width_ratios=[3.4, 1.25])
+    grid = fig.add_gridspec(1, 2, width_ratios=[4.6, 1.0])
     map_ax = fig.add_subplot(grid[0, 0], projection=ccrs.PlateCarree())
     annotation_ax = fig.add_subplot(grid[0, 1])
     map_ax.set_facecolor(style.map_facecolor)
@@ -287,3 +288,67 @@ def render_annotation_panel(
         linespacing=1.3,
         bbox=style.annotation_box(),
     )
+
+
+def render_compact_annotation_card(
+    ax: plt.Axes,
+    title: str,
+    lines: Sequence[str],
+    *,
+    footer: str | None = None,
+    style: FinalProductMapStyle = DEFAULT_FINAL_PRODUCT_MAP_STYLE,
+) -> None:
+    ax.set_axis_off()
+    card = FancyBboxPatch(
+        (0.04, 0.05),
+        0.92,
+        0.90,
+        transform=ax.transAxes,
+        boxstyle="round,pad=0.5",
+        facecolor=style.annotation_facecolor,
+        edgecolor=style.annotation_edgecolor,
+        linewidth=1.0,
+        alpha=style.info_box_alpha,
+    )
+    ax.add_patch(card)
+
+    ax.text(
+        0.10,
+        0.92,
+        title,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        color=style.title_color,
+        fontsize=11.0,
+        fontweight="bold",
+    )
+
+    top = 0.80
+    bottom = 0.18 if footer else 0.12
+    step = 0.0 if not lines else (top - bottom) / max(len(lines) - 1, 1)
+    for index, line in enumerate(lines):
+        y = top - (index * step if len(lines) > 1 else 0.0)
+        ax.text(
+            0.11,
+            y,
+            f"• {line}",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            color=style.text_color,
+            fontsize=9.3,
+            linespacing=1.15,
+        )
+
+    if footer:
+        ax.text(
+            0.10,
+            0.08,
+            footer,
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            color=style.footer_color,
+            fontsize=8.5,
+        )
