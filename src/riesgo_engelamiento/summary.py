@@ -199,6 +199,17 @@ def _build_diagnostics(dataset: xr.Dataset, validation: ValidationReport) -> tup
     return tuple(diagnostics)
 
 
+def _build_limitations(dataset: xr.Dataset) -> tuple[str, ...]:
+    if "PB" in dataset:
+        pb_limitation = (
+            "PB is present, but the current phase-5 proxy still uses the documented approximate path; "
+            "exact PB-based thermodynamic reconstruction is a future refinement."
+        )
+    else:
+        pb_limitation = LIMITATIONS[0]
+    return (pb_limitation, *LIMITATIONS[1:])
+
+
 def build_phase1_summary(dataset: xr.Dataset, validation: ValidationReport, dataset_path: str | Path) -> Phase1Summary:
     times = dataset["XTIME"].values if "XTIME" in dataset else np.array([], dtype="datetime64[ns]")
     time_count = int(times.size)
@@ -225,7 +236,7 @@ def build_phase1_summary(dataset: xr.Dataset, validation: ValidationReport, data
         vertical_staggered_levels=vertical_staggered_levels,
         validation=validation,
         assumptions=ASSUMPTIONS,
-        limitations=LIMITATIONS,
+        limitations=_build_limitations(dataset),
         diagnostics=_build_diagnostics(dataset, validation),
     )
 

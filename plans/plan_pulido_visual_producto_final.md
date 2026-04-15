@@ -116,3 +116,14 @@ Add verification around the new presentation contract so the product stays visua
 - [ ] Tests verify that figure annotations remain within the intended short-form structure rather than regressing to long trace dumps.
 - [ ] Tests verify that highlighted-times output uses compact labels and preserves detailed reasoning outside the PNG.
 - [ ] The CLI still produces the expected PNG, Markdown, and JSON artifacts for the improved final-product flow.
+
+### Phase 5 implementation notes
+
+- The regression suite now exercises both `PB`-present and `PB`-absent datasets through the presentation layer.
+- The final-product and highlighted-times tests assert the report/trace split, short figure copy, and compact highlighted-time labels.
+- End-to-end validation has been run through the CLI entrypoint with the current repository state.
+
+### Phase 5 verification
+
+- `uv run pytest`
+- `uv run riesgo-engelamiento --help`

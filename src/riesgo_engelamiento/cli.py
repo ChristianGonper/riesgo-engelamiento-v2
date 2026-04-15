@@ -14,6 +14,7 @@ from .dataset import DatasetValidationError, assert_valid, open_dataset, validat
 from .final_product import (
     build_final_product_summary,
     build_highlighted_times_summary,
+    detect_dataset_presentation_capabilities,
     write_final_product_outputs,
     write_highlighted_times_outputs,
 )
@@ -104,6 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         validation = validate_dataset(dataset, source=args.dataset)
         summary = build_phase1_summary(dataset, validation, args.dataset)
         markdown_path, json_path = write_phase1_outputs(summary, args.output_dir)
+        presentation_capabilities = detect_dataset_presentation_capabilities(dataset)
 
         if not validation.is_valid:
             print(validation.to_markdown(), file=sys.stderr)
@@ -150,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                         selected_band=args.final_product_band,
                         delivery_mode=delivery_mode,
                         severity_product=phase6_product,
+                        presentation_capabilities=presentation_capabilities,
                         source_artifacts={
                             "phase5_markdown": phase5_markdown_path,
                             "phase5_json": phase5_json_path,
@@ -169,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
                         selected_band=args.final_product_band,
                         delivery_mode=delivery_mode,
                         severity_product=phase6_product,
+                        presentation_capabilities=presentation_capabilities,
                         source_artifacts={
                             "phase6_markdown": phase6_markdown_path,
                             "phase6_json": phase6_json_path,
@@ -203,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
                         reference_time_index=args.time_index,
                         highlighted_times=args.final_product_highlighted_times,
                         highlighted_time_count=args.final_product_highlighted_count,
+                        presentation_capabilities=presentation_capabilities,
                         source_artifacts={
                             "phase5_markdown": phase5_markdown_path,
                             "phase5_json": phase5_json_path,

@@ -541,7 +541,9 @@ def test_main_writes_canonical_final_deliverable_artifacts_when_requested(tmp_pa
     assert "Artifact contract: `presentation/final-deliverable`" in final_markdown_text
     assert "Delivery mode: `canonical`" in final_markdown_text
     assert "Delivery label: entregable final canónico" in final_markdown_text
+    assert "PB is absent, so the report must keep the approximate proxy caveat explicit." in final_markdown_text
     assert "Mode selected: heuristic-severity." in final_payload["presentation_summary"]
+    assert final_payload["report_copy"]["capability_note"] == "PB is absent, so the report must keep the approximate proxy caveat explicit."
     assert final_payload["artifact_kind"] == "presentation/final-deliverable"
     assert final_payload["output_purpose"] == "presentation/final-deliverable"
     assert final_payload["delivery_mode"] == "canonical"
@@ -640,7 +642,7 @@ def test_main_writes_final_product_artifacts_when_requested(tmp_path: Path, monk
     assert final_payload["presentation_summary"].startswith("Mode selected: heuristic-severity.")
     assert "Delivery mode: producto final heredado" in final_payload["presentation_summary"]
     assert "severity moderate" in final_payload["presentation_summary"]
-    assert final_payload["report_copy"]["capability_note"].startswith("PB state unknown")
+    assert final_payload["report_copy"]["capability_note"] == "PB is absent, so the report must keep the approximate proxy caveat explicit."
     assert final_payload["trace_copy"]["presentation_inventory"]["artifact_label"] == "final-product"
     assert "Heuristic-severity adds a graded, band-conditioned score" in final_payload["comparative_summary"]
     assert "not operational icing guidance" in final_payload["aircraft_interpretation"]
@@ -828,10 +830,12 @@ def test_main_writes_highlighted_times_artifacts_when_requested(tmp_path: Path, 
     highlighted_payload = json.loads(highlighted_json[0].read_text(encoding="utf-8"))
 
     assert "Selection mode: auto" in highlighted_markdown_text
+    assert "PB is absent, so the report must keep the approximate proxy caveat explicit." in highlighted_markdown_text
     assert "## Report copy" in highlighted_markdown_text
     assert "### Selection context" in highlighted_markdown_text
     assert "### Highlighted times" in highlighted_markdown_text
     assert highlighted_payload["comparison_mode"] == "highlighted-times"
+    assert highlighted_payload["report_copy"]["capability_note"] == "PB is absent, so the report must keep the approximate proxy caveat explicit."
     assert highlighted_payload["selection_mode"] == "auto"
     assert highlighted_payload["highlighted_time_count"] == 3
     assert highlighted_payload["trace_copy"]["highlighted_time_count"] == 3

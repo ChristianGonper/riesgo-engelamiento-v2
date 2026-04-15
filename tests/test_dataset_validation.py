@@ -113,6 +113,20 @@ def test_validate_dataset_accepts_complete_dataset() -> None:
     assert diagnostics["Phase 6 heuristic severity"].status == "available with caveats"
 
 
+def test_validate_dataset_and_phase1_summary_adjust_pb_notes_when_pb_is_present() -> None:
+    dataset = _build_dataset(include_pb=True)
+    report = validate_dataset(dataset, source="synthetic.nc")
+    summary = build_phase1_summary(dataset, report, "synthetic.nc")
+    markdown = summary.to_markdown()
+
+    assert report.is_valid
+    assert report.warnings == ()
+    diagnostics = {diagnostic.name: diagnostic for diagnostic in summary.diagnostics}
+    assert diagnostics["Approximate icing risk"].reason.startswith("PB is present")
+    assert "PB is present, but the current phase-5 proxy still uses the documented approximate path" in markdown
+    assert "PB is absent, so exact pressure and exact temperature reconstruction are not possible" not in markdown
+
+
 @pytest.mark.parametrize(
     ("include_pb", "expected_state"),
     [

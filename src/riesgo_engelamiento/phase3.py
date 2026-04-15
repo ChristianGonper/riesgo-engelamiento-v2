@@ -312,11 +312,15 @@ def build_phase3_approximate_risk_product(
     risk_horizontal_fraction = float(risk_horizontal_cell_count / horizontal_cell_count) if horizontal_cell_count else 0.0
     risk_vertical_fraction = float(risk_vertical_cell_count / vertical_cell_count) if vertical_cell_count else 0.0
 
+    if "PB" in dataset:
+        proxy_note = "risk remains an explicit proxy; PB is available but not yet applied to an exact thermodynamic reconstruction."
+    else:
+        proxy_note = "risk is an explicit proxy and is not an exact thermodynamic diagnosis because PB is absent."
     approximation_notes = (
         "theta is recovered as T + 300 K from the perturbation potential temperature field.",
         "pressure_proxy linearly interpolates between 5000 Pa at eta=0 and 100000 Pa at eta=1, then adds P.",
         f"temperature_proxy uses a Poisson exponent of {APPROXIMATE_POISSON_KAPPA:.3f} and a freezing threshold of {APPROXIMATE_FREEZING_THRESHOLD_K:.2f} K.",
-        "risk is an explicit proxy and is not an exact thermodynamic diagnosis because PB is absent.",
+        proxy_note,
     )
 
     return Phase3ApproximateRiskProduct(

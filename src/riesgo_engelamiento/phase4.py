@@ -587,7 +587,11 @@ def build_phase4_heuristic_severity_product(
             f"high<{HEURISTIC_SEVERITY_SCORE_THRESHOLDS[2]:.0f}, severe otherwise."
         ),
         "vertical bands are relative model-level groups: upper, middle and lower eta ranges.",
-        "the score is intentionally not an exact physical intensity metric because PB is unavailable.",
+        (
+            "the score is intentionally not an exact physical intensity metric because PB is unavailable."
+            if "PB" not in dataset
+            else "the score remains a heuristic proxy even when PB is present; PB-based thermodynamic refinement is still future work."
+        ),
     )
 
     return Phase4HeuristicSeverityProduct(
