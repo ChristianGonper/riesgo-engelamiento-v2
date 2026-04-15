@@ -71,6 +71,12 @@ Redesign the highlighted-times artifact as a compact editorial figure. Keep the 
 - [ ] The visual emphasis stays on the temporal signal and shortlisted comparisons rather than on explanatory text blocks.
 - [ ] The full detailed selection rationale remains available outside the PNG.
 
+### Phase 3 implementation notes
+
+- The highlighted-times PNG now uses compact clock-style labels on the time axis when all moments share the same day, and keeps the detailed ISO labels in the trace payload.
+- The shortlist notes card has been reduced to a short reference line plus one compact line per highlighted moment, so the series and shortlist comparison remain the dominant panels.
+- The selection rationale stays in Markdown and JSON, not in the visible PNG notes block.
+
 ---
 
 ## Phase 4: Report And Trace Realignment

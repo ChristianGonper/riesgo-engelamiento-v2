@@ -15,6 +15,7 @@ from riesgo_engelamiento.final_product import (
     detect_dataset_presentation_capabilities,
     build_final_product_figure,
     build_final_product_summary,
+    build_highlighted_times_figure,
     build_highlighted_times_summary,
     write_final_product_outputs,
     write_highlighted_times_outputs,
@@ -237,9 +238,46 @@ def test_highlighted_times_summary_tracks_inventory_contract_and_pb_absence() ->
     assert "paragraph-style selection reasons" in payload["presentation_contract"]["figure_prohibited"]
     assert payload["presentation_capabilities"]["presentation_state"] == "pb-absent"
     assert payload["presentation_capabilities"]["has_pb"] is False
+    assert payload["figure_copy"]["title"] == "Highlighted times - auto"
+    assert payload["figure_copy"]["annotation_title"] == "Shortlist notes"
+    assert payload["figure_copy"]["annotation_lines"][0] == "Reference: 19:00"
+    assert len(payload["figure_copy"]["annotation_lines"]) == 4
+    assert payload["figure_copy"]["annotation_lines"][1].startswith("#1 ")
+    assert all("selected as" not in line for line in payload["figure_copy"]["annotation_lines"])
+    assert payload["source_metrics"]["time_display_labels"] == ["18:00", "19:00", "20:00", "21:00"]
     assert "## Presentation inventory" in markdown
     assert "## Presentation contract" in markdown
     assert "PB absent: the presentation remains proxy-only." in markdown
+
+
+def test_highlighted_times_figure_uses_compact_labels_and_short_notes() -> None:
+    dataset = _build_highlighted_times_dataset()
+    phase6_product = build_phase6_heuristic_severity_product(dataset, "synthetic.nc", time_index=1)
+    summary = build_highlighted_times_summary(
+        phase6_product,
+        "synthetic.nc",
+        source_mode="approximate-risk",
+        highlighted_time_count=3,
+    )
+
+    figure = build_highlighted_times_figure(summary)
+    try:
+        assert len(figure.axes) == 3
+        series_ax, compare_ax, notes_ax = figure.axes
+        series_labels = [tick.get_text() for tick in series_ax.get_xticklabels()]
+        compare_labels = [tick.get_text() for tick in compare_ax.get_xticklabels()]
+        notes_text = "\n".join(text.get_text() for text in notes_ax.texts)
+
+        assert series_labels == ["18:00", "19:00", "20:00", "21:00"]
+        assert all("T" not in label for label in compare_labels)
+        assert compare_labels[0].startswith("#1 ")
+        assert "Shortlist notes" in notes_text
+        assert "Reference:" in notes_text
+        assert "Mode:" not in notes_text
+        assert "selected as the maximum" not in notes_text
+        assert "Rationale stays in Markdown and JSON." not in notes_text
+    finally:
+        plt.close(figure)
 
 
 def test_final_product_summary_exports_traceable_risk_view(tmp_path: Path) -> None:
@@ -642,6 +680,9 @@ def test_highlighted_times_summary_explicit_selection_exports_traceable_metadata
         "selected from the user-requested highlighted-time list",
     ]
     assert len(payload["highlighted_times"]) == 2
+    assert payload["figure_copy"]["title"] == "Highlighted times - explicit"
+    assert len(payload["figure_copy"]["annotation_lines"]) == 3
+    assert all("selected from" not in line for line in payload["figure_copy"]["annotation_lines"])
     assert payload["highlighted_times"][0]["selection_rule"] == "explicit-request"
     assert "highlighted_times" in payload["contract"]["required_metadata_fields"]
     assert "selection_mode" in payload["contract"]["required_metadata_fields"]
@@ -689,6 +730,9 @@ def test_highlighted_times_summary_auto_selection_is_reproducible(tmp_path: Path
     assert len(payload["highlighted_times"]) == 3
     assert payload["highlighted_times"][0]["rank"] == 1
     assert payload["highlighted_times"][0]["selection_rule"] in {"max-severity", "max-persistence", "max-risk-coverage"}
+    assert payload["figure_copy"]["annotation_title"] == "Shortlist notes"
+    assert payload["source_metrics"]["reference_time_display_label"] == "19:00"
+    assert len(payload["figure_copy"]["annotation_lines"]) == 4
     assert payload["contract"]["artifact_kind"] == "presentation/final-product/highlighted-times"
     assert "highlighted_time_indices" in payload["contract"]["required_metadata_fields"]
     assert "highlighted_times" in payload["contract"]["required_metadata_fields"]

@@ -1280,6 +1280,7 @@ class HighlightedTimeComparisonSummary:
             "highlighted_time_labels": [record.time_label for record in self.highlighted_times],
             "highlighted_time_reasons": [record.selection_reason for record in self.highlighted_times],
             "highlighted_times": [record.to_dict() for record in self.highlighted_times],
+            "figure_copy": self.figure_copy().to_dict(),
             "presentation_summary": self.presentation_summary_text(),
             "comparative_summary": self.comparative_summary_text(),
             "aircraft_interpretation": self.aircraft_interpretation_text(),
@@ -1294,6 +1295,9 @@ class HighlightedTimeComparisonSummary:
         if output_paths is not None:
             payload["outputs"] = {name: str(path) for name, path in output_paths.items()}
         return payload
+
+    def figure_copy(self) -> FinalProductFigureCopy:
+        return build_highlighted_times_figure_copy(self)
 
     def to_markdown(self, output_paths: dict[str, Path] | None = None) -> str:
         def _format_value(value: Any) -> str:
@@ -1450,9 +1454,76 @@ def _coerce_time_value(value: Any) -> str | None:
     return text or None
 
 
+def _compact_time_labels(time_labels: Sequence[str]) -> list[str]:
+    normalized_labels = [label.strip() for label in time_labels if label and str(label).strip()]
+    shared_date: str | None = None
+    date_parts = [label.split("T", 1)[0] for label in normalized_labels if "T" in label]
+    if date_parts and all(date_part == date_parts[0] for date_part in date_parts):
+        shared_date = date_parts[0]
+
+    compact_labels: list[str] = []
+    for label in time_labels:
+        text = str(label).strip() if label is not None else ""
+        if not text:
+            compact_labels.append("unknown")
+            continue
+        if "T" not in text:
+            compact_labels.append(text)
+            continue
+        date_part, time_part = text.split("T", 1)
+        compact_clock = time_part[:5] if len(time_part) >= 5 else time_part
+        if shared_date is not None:
+            compact_labels.append(compact_clock)
+        else:
+            compact_date = date_part[5:] if len(date_part) >= 10 else date_part
+            compact_labels.append(f"{compact_date} {compact_clock}")
+    return compact_labels
+
+
 def _series_time_labels(product: Phase6HeuristicSeverityProduct) -> list[str]:
     time_values = product.time_risk_horizontal_fraction.coords["Time"].values
     return [_coerce_time_value(value) or str(index) for index, value in enumerate(time_values)]
+
+
+def build_highlighted_times_figure_copy(summary: HighlightedTimeComparisonSummary) -> FinalProductFigureCopy:
+    reference_source = summary.source_metrics.get("reference_time_display_label")
+    if isinstance(reference_source, str) and reference_source.strip():
+        reference_label = reference_source.strip()
+    else:
+        reference_label = _compact_time_labels([summary.reference_time_label or f"t{summary.reference_time_index:03d}"])[0]
+
+    highlighted_source = summary.source_metrics.get("highlighted_time_display_labels")
+    if isinstance(highlighted_source, (list, tuple)):
+        compact_highlighted_labels = [str(label) for label in highlighted_source]
+    else:
+        time_labels = summary.source_metrics.get("time_labels")
+        if isinstance(time_labels, (list, tuple)):
+            compact_labels = _compact_time_labels([str(label) for label in time_labels])
+            compact_highlighted_labels = [
+                compact_labels[record.time_index] if record.time_index < len(compact_labels) else (record.time_label or f"t{record.time_index:03d}")
+                for record in summary.highlighted_times
+            ]
+        else:
+            compact_highlighted_labels = [
+                _compact_time_labels([record.time_label or f"t{record.time_index:03d}"])[0]
+                for record in summary.highlighted_times
+            ]
+
+    lines = [
+        f"Reference: {reference_label}",
+    ]
+    for record, compact_label in zip(summary.highlighted_times, compact_highlighted_labels):
+        lines.append(
+            f"#{record.rank} {compact_label} | S{record.severity_score:.0f} P{record.persistence_fraction:.0%} R{record.risk_horizontal_fraction:.0%}"
+        )
+
+    return FinalProductFigureCopy(
+        title=f"Highlighted times - {summary.selection_mode}",
+        subtitle=f"Reference {reference_label} | shortlist comparison",
+        annotation_title="Shortlist notes",
+        annotation_lines=tuple(lines),
+        footer="",
+    )
 
 
 def _highlighted_time_series(product: Phase6HeuristicSeverityProduct) -> dict[str, np.ndarray]:
@@ -1598,6 +1669,7 @@ def build_highlighted_times_summary(
 ) -> HighlightedTimeComparisonSummary:
     dataset_path = Path(dataset_path)
     time_labels = _series_time_labels(source_product)
+    display_time_labels = _compact_time_labels(time_labels)
     series = _highlighted_time_series(source_product)
     time_count = int(series["severity_score"].shape[0])
     if time_count == 0:
@@ -1633,6 +1705,7 @@ def build_highlighted_times_summary(
     source_metrics = {
         "time_count": time_count,
         "time_labels": time_labels,
+        "time_display_labels": display_time_labels,
         "time_severity_score": series["severity_score"].tolist(),
         "time_persistence_fraction": series["persistence_fraction"].tolist(),
         "time_risk_horizontal_fraction": series["risk_horizontal_fraction"].tolist(),
@@ -1655,6 +1728,11 @@ def build_highlighted_times_summary(
         "peak_coverage_fraction": float(series["risk_horizontal_fraction"][peak_coverage_index]),
         "selection_basis": selection_basis,
         "selection_mode": selection_mode,
+        "reference_time_display_label": display_time_labels[reference_index] if reference_index < len(display_time_labels) else (reference_label or f"t{reference_index:03d}"),
+        "highlighted_time_display_labels": [
+            display_time_labels[index] if index < len(display_time_labels) else (time_labels[index] if index < len(time_labels) else f"t{index:03d}")
+            for index, _ in selected
+        ],
     }
 
     return HighlightedTimeComparisonSummary(
@@ -1676,24 +1754,7 @@ def build_highlighted_times_summary(
 
 
 def _highlighted_times_annotation_lines(summary: HighlightedTimeComparisonSummary) -> tuple[str, ...]:
-    lines = [
-        f"Reference time: {summary.reference_time_label or summary.reference_time_index}",
-        f"Selection mode: {summary.selection_mode}",
-        f"Selection basis: {summary.selection_basis}",
-        "",
-    ]
-    for record in summary.highlighted_times:
-        lines.extend(
-            [
-                f"#{record.rank} {record.time_label or record.time_index}",
-                f"Rule: {record.selection_rule}",
-                f"Reason: {record.selection_reason}",
-                f"Severity: {record.severity_score:.1f}/100 ({record.severity_class})",
-                f"Persistence: {record.persistence_fraction:.1%} | Risk: {record.risk_horizontal_fraction:.1%} | Liquid: {record.liquid_horizontal_fraction:.1%}",
-                "",
-            ]
-        )
-    return tuple(lines)
+    return build_highlighted_times_figure_copy(summary).annotation_lines
 
 
 def build_highlighted_times_figure(
@@ -1702,21 +1763,28 @@ def build_highlighted_times_figure(
     style=DEFAULT_FINAL_PRODUCT_MAP_STYLE,
 ):
     fig = plt.figure(
-        figsize=(style.figure_size[0], style.figure_size[1] + 1.9),
+        figsize=(style.figure_size[0], style.figure_size[1] + 1.3),
         dpi=style.dpi,
         facecolor=style.figure_facecolor,
         constrained_layout=True,
     )
-    grid = fig.add_gridspec(3, 1, height_ratios=[1.25, 0.95, 1.1])
+    grid = fig.add_gridspec(3, 1, height_ratios=[1.45, 1.05, 0.75])
     series_ax = fig.add_subplot(grid[0, 0])
     compare_ax = fig.add_subplot(grid[1, 0])
     notes_ax = fig.add_subplot(grid[2, 0])
 
     time_labels = summary.source_metrics.get("time_labels", [])
+    display_time_labels = summary.source_metrics.get("time_display_labels", [])
+    if not isinstance(display_time_labels, (list, tuple)):
+        display_time_labels = _compact_time_labels([str(label) for label in time_labels]) if time_labels else []
+    highlighted_display_labels = summary.source_metrics.get("highlighted_time_display_labels", [])
+    if not isinstance(highlighted_display_labels, (list, tuple)):
+        highlighted_display_labels = [record.time_label or f"t{record.time_index:03d}" for record in summary.highlighted_times]
     time_positions = np.arange(len(time_labels))
     severity = np.asarray(summary.source_metrics.get("time_severity_score", []), dtype=np.float32)
     persistence = np.asarray(summary.source_metrics.get("time_persistence_fraction", []), dtype=np.float32) * 100.0
     risk = np.asarray(summary.source_metrics.get("time_risk_horizontal_fraction", []), dtype=np.float32) * 100.0
+    figure_copy = summary.figure_copy()
 
     series_ax.plot(time_positions, severity, color="#111827", marker="o", linewidth=1.8, label="Severity score")
     series_ax.plot(time_positions, persistence, color="#2563eb", marker="s", linestyle="--", linewidth=1.3, label="Persistence (%)")
@@ -1743,7 +1811,7 @@ def build_highlighted_times_figure(
             fontweight="bold",
         )
     series_ax.set_title(
-        "Highlighted times across the selected series",
+        "Temporal signal with highlighted moments",
         loc="left",
         color=style.title_color,
         fontweight="bold",
@@ -1752,7 +1820,7 @@ def build_highlighted_times_figure(
     series_ax.text(
         0.0,
         1.02,
-        f"Reference time {summary.reference_time_label or summary.reference_time_index} | mode {summary.source_mode} | {summary.selection_mode}",
+        figure_copy.subtitle,
         transform=series_ax.transAxes,
         ha="left",
         va="bottom",
@@ -1761,7 +1829,7 @@ def build_highlighted_times_figure(
     )
     series_ax.set_ylabel("Score / percent")
     series_ax.set_xticks(time_positions)
-    series_ax.set_xticklabels(time_labels, rotation=45, ha="right")
+    series_ax.set_xticklabels([str(label) for label in display_time_labels], rotation=0, ha="center")
     series_ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
     series_ax.grid(True, color=style.grid_color, linestyle="--", linewidth=0.6, alpha=0.28)
     legend = series_ax.legend(
@@ -1798,11 +1866,13 @@ def build_highlighted_times_figure(
         color="#b91c1c",
         label="Risk coverage (%)",
     )
-    compare_ax.set_title("Compact comparison for the highlighted shortlist", loc="left", color=style.title_color, pad=10, fontweight="bold")
+    compare_ax.set_title("Shortlist comparison", loc="left", color=style.title_color, pad=10, fontweight="bold")
     compare_ax.set_ylabel("Score / percent")
     compare_ax.set_xticks(compare_positions)
     compare_ax.set_xticklabels(
-        [f"#{record.rank}\n{record.time_label or record.time_index}" for record in summary.highlighted_times]
+        [f"#{record.rank} · {display_label}" for record, display_label in zip(summary.highlighted_times, highlighted_display_labels)],
+        rotation=0,
+        ha="center",
     )
     compare_ax.set_ylim(0.0, 100.0)
     compare_ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
@@ -1816,15 +1886,15 @@ def build_highlighted_times_figure(
     )
     compare_ax.tick_params(colors=style.text_color)
 
-    render_annotation_panel(
+    render_compact_annotation_card(
         notes_ax,
-        "Highlighted-time selection notes",
+        figure_copy.annotation_title,
         _highlighted_times_annotation_lines(summary),
-        footer="Compact presentation output built from phase-6 temporal diagnostics and the current final-product context.",
+        footer=figure_copy.footer or None,
         style=style,
     )
     fig.suptitle(
-        f"Riesgo de engelamiento - tiempos destacados ({summary.selection_mode})",
+        figure_copy.title,
         color=style.title_color,
         fontsize=16,
         fontweight="bold",
