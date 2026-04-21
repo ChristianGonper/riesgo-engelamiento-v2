@@ -8,8 +8,8 @@ import numpy as np
 import xarray as xr
 from fastapi import HTTPException
 
-from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
 from riesgo_engelamiento.cache_store import IcingCacheStore
+from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
 
 
 def _load_backend_main_module():
@@ -94,15 +94,23 @@ class _DatasetContext:
         return False
 
 
-def test_map_metadata_reports_python_vertical_options(monkeypatch) -> None:
-    backend_main = _load_backend_main_module()
-    dataset = _build_backend_dataset()
+def _patch_dataset_and_cache(
+    monkeypatch, backend_main, dataset: xr.Dataset, cache_root: Path
+) -> None:
     monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
     monkeypatch.setattr(
         backend_main,
         "CACHE_STORE",
-        IcingCacheStore(backend_main.DATASET_PATH, Path.cwd() / "tmp-cache-for-tests"),
+        IcingCacheStore(backend_main.DATASET_PATH, cache_root),
     )
+
+
+def test_map_metadata_reports_python_vertical_options(
+    monkeypatch, tmp_path: Path
+) -> None:
+    backend_main = _load_backend_main_module()
+    dataset = _build_backend_dataset()
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     payload = asyncio.run(backend_main.map_metadata())
     assert payload["timeCount"] == 2
@@ -116,15 +124,10 @@ def test_map_metadata_reports_python_vertical_options(monkeypatch) -> None:
     }
 
 
-def test_cache_status_and_recalculate_endpoint(monkeypatch) -> None:
+def test_cache_status_and_recalculate_endpoint(monkeypatch, tmp_path: Path) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
-    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
-    monkeypatch.setattr(
-        backend_main,
-        "CACHE_STORE",
-        IcingCacheStore(backend_main.DATASET_PATH, Path.cwd() / "tmp-cache-for-tests"),
-    )
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     cache_status = asyncio.run(backend_main.cache_status())
     recalculated = asyncio.run(backend_main.recalculate_cache())
@@ -134,10 +137,10 @@ def test_cache_status_and_recalculate_endpoint(monkeypatch) -> None:
     assert recalculated["cacheStatus"]["metadataCached"] is True
 
 
-def test_risk_map_supports_generic_and_band_modes(monkeypatch) -> None:
+def test_risk_map_supports_generic_and_band_modes(monkeypatch, tmp_path: Path) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
-    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     generic_payload = asyncio.run(
         backend_main.risk_map(time_index=0, mode="generic", vertical_option=None)
@@ -153,10 +156,10 @@ def test_risk_map_supports_generic_and_band_modes(monkeypatch) -> None:
     assert generic_payload["severityRange"][1] >= lower_payload["severityRange"][1]
 
 
-def test_risk_map_rejects_invalid_vertical_option(monkeypatch) -> None:
+def test_risk_map_rejects_invalid_vertical_option(monkeypatch, tmp_path: Path) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
-    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     try:
         asyncio.run(
@@ -171,10 +174,12 @@ def test_risk_map_rejects_invalid_vertical_option(monkeypatch) -> None:
         raise AssertionError("Expected HTTPException for invalid vertical option")
 
 
-def test_cross_section_returns_surface_to_maximum_profile(monkeypatch) -> None:
+def test_cross_section_returns_surface_to_maximum_profile(
+    monkeypatch, tmp_path: Path
+) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
-    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     payload = asyncio.run(
         backend_main.cross_section(
@@ -190,12 +195,15 @@ def test_cross_section_returns_surface_to_maximum_profile(monkeypatch) -> None:
     assert payload["profile_shape"] == [3, 6]
     assert payload["verticalExtent"] == "surface-to-maximum"
     assert payload["xAxisLabel"] == "Distancia acumulada (km)"
+    assert payload["visualBands"][1]["label"] == "Medio"
 
 
-def test_cross_section_rejects_route_outside_domain(monkeypatch) -> None:
+def test_cross_section_rejects_route_outside_domain(
+    monkeypatch, tmp_path: Path
+) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
-    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, tmp_path / "cache")
 
     try:
         asyncio.run(
@@ -213,3 +221,22 @@ def test_cross_section_rejects_route_outside_domain(monkeypatch) -> None:
         assert "outside the dataset geographic domain" in str(exc.detail)
     else:
         raise AssertionError("Expected HTTPException for route outside domain")
+
+
+def test_risk_map_reuses_cached_artifact(monkeypatch, tmp_path: Path) -> None:
+    backend_main = _load_backend_main_module()
+    dataset = _build_backend_dataset()
+    cache_root = tmp_path / "cache"
+    _patch_dataset_and_cache(monkeypatch, backend_main, dataset, cache_root)
+
+    first_payload = asyncio.run(
+        backend_main.risk_map(time_index=1, mode="generic", vertical_option=None)
+    )
+    second_payload = asyncio.run(
+        backend_main.risk_map(time_index=1, mode="generic", vertical_option=None)
+    )
+
+    cache_status = asyncio.run(backend_main.cache_status())
+    assert first_payload["overlayImage"] == second_payload["overlayImage"]
+    assert cache_status["artifactCount"] >= 1
+    assert any(cache_root.glob("derived/**/*.json"))
