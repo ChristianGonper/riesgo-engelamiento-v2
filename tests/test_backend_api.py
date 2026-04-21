@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import base64
 import importlib.util
 import asyncio
+from io import BytesIO
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from fastapi import HTTPException
 
 from riesgo_engelamiento.cache_store import IcingCacheStore
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
+from riesgo_engelamiento.web_api import _severity_to_overlay_rgba
 
 
 def _load_backend_main_module():
@@ -154,6 +158,15 @@ def test_risk_map_supports_generic_and_band_modes(monkeypatch, tmp_path: Path) -
     assert generic_payload["overlayImage"].startswith("data:image/png;base64,")
     assert lower_payload["resolvedVerticalOption"] == "lower"
     assert generic_payload["severityRange"][1] >= lower_payload["severityRange"][1]
+
+
+def test_risk_map_overlay_keeps_zero_severity_transparent(
+    monkeypatch, tmp_path: Path
+) -> None:
+    rgba = _severity_to_overlay_rgba(np.array([[0.0, 1.0]], dtype=np.float32))
+
+    assert rgba[0, 0, 3] == 0.0
+    assert rgba[0, 1, 3] > 0.0
 
 
 def test_risk_map_rejects_invalid_vertical_option(monkeypatch, tmp_path: Path) -> None:

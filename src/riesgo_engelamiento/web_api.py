@@ -141,10 +141,17 @@ def _band_mask(option_id: str, phase6_product) -> np.ndarray:
     raise ValueError(f"Unsupported vertical option: {option_id}")
 
 
-def _array_to_png_data_url(values: np.ndarray) -> str:
+def _severity_to_overlay_rgba(values: np.ndarray) -> np.ndarray:
     normalized = np.clip(values / 100.0, 0.0, 1.0)
     rgba = plt.get_cmap("magma")(normalized)
-    rgba[..., 3] = np.where(values > 0.0, 0.74, 0.0)
+    alpha = np.where(values >= 1.0, np.clip(0.12 + normalized * 0.78, 0.0, 0.9), 0.0)
+    rgba[..., 3] = alpha
+    rgba[..., :3] = np.where(alpha[..., None] > 0.0, rgba[..., :3], 0.0)
+    return rgba
+
+
+def _array_to_png_data_url(values: np.ndarray) -> str:
+    rgba = _severity_to_overlay_rgba(values)
     buffer = BytesIO()
     plt.imsave(buffer, rgba, format="png")
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
