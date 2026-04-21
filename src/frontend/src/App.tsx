@@ -206,6 +206,13 @@ function App() {
   const threatLabel = severityLabel(threatValue)
   const threatColor = severityColor(threatValue)
   const cacheLabel = cacheStatus?.state ?? 'missing'
+  const frameStatus = isMapLoading
+    ? 'Cargando frame de mapa...'
+    : isCrossSectionLoading
+      ? 'Actualizando corte de ruta...'
+      : route
+        ? 'Ruta activa sincronizada con el tiempo.'
+        : 'Selecciona dos puntos para obtener el corte vertical.'
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-dark text-white selection:bg-info/30">
@@ -311,7 +318,14 @@ function App() {
               {crossSectionError}
             </div>
           ) : (
-            <CrossSectionHeatmap payload={crossSection} />
+            <div className="relative h-full">
+              <CrossSectionHeatmap payload={crossSection} />
+              {isCrossSectionLoading ? (
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/24 text-xs uppercase tracking-[0.24em] text-white/60">
+                  Actualizando
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>
@@ -383,8 +397,8 @@ function App() {
         </div>
 
         <div className="flex items-center justify-between text-xs text-white/50">
-          <span>{mapError ?? 'Mapa alimentado por overlay real del backend.'}</span>
-          <span>{route ? 'Ruta activa sincronizada con el tiempo.' : 'Selecciona dos puntos para obtener el corte vertical.'}</span>
+          <span>{mapError ?? (isMapLoading ? 'Cargando overlay del tiempo actual.' : 'Mapa alimentado por overlay real del backend.')}</span>
+          <span>{frameStatus}</span>
         </div>
       </div>
 
