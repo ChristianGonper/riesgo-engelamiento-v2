@@ -1,6 +1,6 @@
 {
   "datasetPath": "C:\\Users\\chris\\Documents\\Universidad\\METEO\\riesgo-engelamiento\\wrfout_d01_2015-04-17_18_00_00_corte",
-  "timeCount": 2,
+  "timeCount": 11,
   "times": [
     {
       "index": 0,
@@ -9,6 +9,42 @@
     {
       "index": 1,
       "label": "2015-04-17T21:00:00"
+    },
+    {
+      "index": 2,
+      "label": "2015-04-18T00:00:00"
+    },
+    {
+      "index": 3,
+      "label": "2015-04-18T03:00:00"
+    },
+    {
+      "index": 4,
+      "label": "2015-04-18T06:00:00"
+    },
+    {
+      "index": 5,
+      "label": "2015-04-18T09:00:00"
+    },
+    {
+      "index": 6,
+      "label": "2015-04-18T12:00:00"
+    },
+    {
+      "index": 7,
+      "label": "2015-04-18T15:00:00"
+    },
+    {
+      "index": 8,
+      "label": "2015-04-18T18:00:00"
+    },
+    {
+      "index": 9,
+      "label": "2015-04-18T21:00:00"
+    },
+    {
+      "index": 10,
+      "label": "2015-04-19T00:00:00"
     }
   ],
   "riskModes": [
@@ -31,7 +67,7 @@
         "kind": "band",
         "etaMin": null,
         "etaMax": null,
-        "levelCount": 1
+        "levelCount": 34
       },
       {
         "id": "upper",
@@ -39,7 +75,7 @@
         "kind": "band",
         "etaMin": 0.66,
         "etaMax": 1.0,
-        "levelCount": 1
+        "levelCount": 34
       },
       {
         "id": "middle",
@@ -47,7 +83,7 @@
         "kind": "band",
         "etaMin": 0.33,
         "etaMax": 0.66,
-        "levelCount": 1
+        "levelCount": 12
       },
       {
         "id": "lower",
@@ -55,18 +91,18 @@
         "kind": "band",
         "etaMin": 0.0,
         "etaMax": 0.33,
-        "levelCount": 1
+        "levelCount": 7
       }
     ]
   },
   "mapBounds": [
     [
-      40.0,
-      -3.0
+      35.2564697265625,
+      -15.3720703125
     ],
     [
-      41.0,
-      -2.0
+      55.98446273803711,
+      19.3720703125
     ]
   ]
 }
