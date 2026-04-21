@@ -12,6 +12,10 @@ function colorForSeverity(value: number) {
   return `hsl(${hue} 88% ${lightness}%)`
 }
 
+function isNoData(value: number) {
+  return Number.isNaN(value) || value < 0
+}
+
 export function CrossSectionHeatmap({ payload, expanded = false }: CrossSectionHeatmapProps) {
   if (!payload) {
     return (
@@ -32,6 +36,7 @@ export function CrossSectionHeatmap({ payload, expanded = false }: CrossSectionH
   const innerHeight = height - bottomPadding - topPadding
   const cellWidth = columns > 0 ? innerWidth / columns : innerWidth
   const cellHeight = rows > 0 ? innerHeight / rows : innerHeight
+  const bands = payload.visualBands ?? []
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -42,8 +47,23 @@ export function CrossSectionHeatmap({ payload, expanded = false }: CrossSectionH
       <div className="rounded-xl border border-white/10 bg-black/45 p-3">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full">
           <rect x="0" y="0" width={width} height={height} fill="rgba(4, 9, 18, 0.92)" rx="16" />
+          {bands.map((band, index) => {
+            const bandHeight = innerHeight * (band.end - band.start)
+            const y = topPadding + innerHeight - innerHeight * band.end
+            return (
+              <g key={`${band.label}-${index}`}>
+                <rect x={leftPadding} y={y} width={innerWidth} height={bandHeight} fill="rgba(255,255,255,0.025)" />
+                <text x={width - 18} y={y + 14} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="end">
+                  {band.label}
+                </text>
+              </g>
+            )
+          })}
           {payload.profile.map((row, rowIndex) =>
             row.map((value, columnIndex) => {
+              if (isNoData(value)) {
+                return null
+              }
               const x = leftPadding + columnIndex * cellWidth
               const y = topPadding + rowIndex * cellHeight
               return (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CircleMarker,
   ImageOverlay,
@@ -12,10 +12,13 @@ import { Maximize2, Minimize2, Pause, Play } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
 import {
+  fetchCacheStatus,
   fetchCrossSection,
   fetchMapMetadata,
   fetchRiskMap,
+  recalculateCache,
   type CrossSectionPayload,
+  type CacheStatus,
   type MapMetadata,
   type RiskMapPayload,
   type RiskMode,
@@ -78,10 +81,17 @@ function App() {
   const [route, setRoute] = useState<RouteSelection | null>(null)
   const [riskMap, setRiskMap] = useState<RiskMapPayload | null>(null)
   const [crossSection, setCrossSection] = useState<CrossSectionPayload | null>(null)
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
   const [isCrossSectionExpanded, setIsCrossSectionExpanded] = useState(false)
+  const [isMapLoading, setIsMapLoading] = useState(false)
+  const [isCrossSectionLoading, setIsCrossSectionLoading] = useState(false)
   const [status, setStatus] = useState<string>('Cargando Aerofrost...')
   const [mapError, setMapError] = useState<string | null>(null)
   const [crossSectionError, setCrossSectionError] = useState<string | null>(null)
+  const mapRequestId = useRef(0)
+  const crossSectionRequestId = useRef(0)
+  const mapLoadingRef = useRef(false)
+  const crossSectionLoadingRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -98,8 +108,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    fetchCacheStatus(controller.signal)
+      .then((payload) => setCacheStatus(payload))
+      .catch(() => setCacheStatus(null))
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
     if (!metadata || !isPlaying || metadata.timeCount <= 1) return undefined
     const timer = window.setInterval(() => {
+      if (mapLoadingRef.current || crossSectionLoadingRef.current) return
       setTimeIndex((current) => (current + 1) % metadata.timeCount)
     }, 1400)
     return () => window.clearInterval(timer)
@@ -108,14 +127,26 @@ function App() {
   useEffect(() => {
     if (!metadata) return
     const controller = new AbortController()
+    const requestId = mapRequestId.current + 1
+    mapRequestId.current = requestId
+    mapLoadingRef.current = true
+    setIsMapLoading(true)
     setMapError(null)
     fetchRiskMap(timeIndex, riskMode, riskMode === 'flight-level' ? verticalOption : null, controller.signal)
       .then((payload) => {
-        setRiskMap(payload)
+        if (mapRequestId.current === requestId) {
+          setRiskMap(payload)
+        }
       })
       .catch((error: Error) => {
-        if (error.name !== 'AbortError') {
+        if (error.name !== 'AbortError' && mapRequestId.current === requestId) {
           setMapError(error.message)
+        }
+      })
+      .finally(() => {
+        if (mapRequestId.current === requestId) {
+          mapLoadingRef.current = false
+          setIsMapLoading(false)
         }
       })
     return () => controller.abort()
@@ -125,9 +156,15 @@ function App() {
     if (!route) {
       setCrossSection(null)
       setCrossSectionError(null)
+      setIsCrossSectionLoading(false)
+      crossSectionLoadingRef.current = false
       return
     }
     const controller = new AbortController()
+    const requestId = crossSectionRequestId.current + 1
+    crossSectionRequestId.current = requestId
+    crossSectionLoadingRef.current = true
+    setIsCrossSectionLoading(true)
     setCrossSectionError(null)
     fetchCrossSection(
       {
@@ -139,13 +176,21 @@ function App() {
         routePoints: 160,
       },
       controller.signal,
-    )
+      )
       .then((payload) => {
-        setCrossSection(payload)
+        if (crossSectionRequestId.current === requestId) {
+          setCrossSection(payload)
+        }
       })
       .catch((error: Error) => {
-        if (error.name !== 'AbortError') {
+        if (error.name !== 'AbortError' && crossSectionRequestId.current === requestId) {
           setCrossSectionError(error.message)
+        }
+      })
+      .finally(() => {
+        if (crossSectionRequestId.current === requestId) {
+          crossSectionLoadingRef.current = false
+          setIsCrossSectionLoading(false)
         }
       })
     return () => controller.abort()
@@ -160,6 +205,7 @@ function App() {
   const threatValue = riskMap?.severityRange[1] ?? 0
   const threatLabel = severityLabel(threatValue)
   const threatColor = severityColor(threatValue)
+  const cacheLabel = cacheStatus?.state ?? 'missing'
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-dark text-white selection:bg-info/30">
@@ -194,6 +240,27 @@ function App() {
         <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
           {status}
         </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/55">
+          {cacheStatus ? `${cacheStatus.artifactCount} artefactos cacheados` : 'Cache sin estado'}
+        </div>
+        <button
+          type="button"
+          className="rounded-2xl border border-info/30 bg-info/10 px-4 py-3 text-sm text-info transition hover:bg-info/20"
+          onClick={async () => {
+            try {
+              setStatus('Recalculando archivo...')
+              const payload = await recalculateCache()
+              setCacheStatus(payload.cacheStatus)
+              setMetadata(payload.metadata)
+              setStatus('Archivo listo.')
+            } catch (error) {
+              setStatus(error instanceof Error ? error.message : 'Recalculo fallido')
+            }
+          }}
+        >
+          Recalcular archivo
+        </button>
+        <div className="text-xs tracking-[0.18em] text-white/45">CACHE {cacheLabel.toUpperCase()}</div>
       </div>
 
       <div className="absolute right-8 top-8 z-20 flex h-44 w-80 flex-col gap-3 rounded-3xl p-6 frost-panel shadow-2xl">
@@ -287,6 +354,13 @@ function App() {
             </select>
           </div>
         ) : null}
+
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-white/45">
+          <span>
+            Cache {cacheStatus?.state ?? 'missing'}{isMapLoading ? ' · mapa' : ''}{isCrossSectionLoading ? ' · corte' : ''}
+          </span>
+          <span>{cacheStatus?.lastRecalculatedAt ?? 'sin recalculo'}</span>
+        </div>
 
         <div className="grid grid-cols-[auto_auto_1fr] items-center gap-4">
           <button

@@ -99,6 +99,7 @@ def test_route_profile_builds_distance_and_profile_shape() -> None:
     assert payload["artifact_kind"] == "presentation/route-icing-profile"
     assert payload["route_point_count"] == 6
     assert payload["profile_shape"] == [3, 6]
+    assert payload["visualBands"][0]["label"] == "Bajo"
 
 
 def test_route_profile_render_creates_expected_axes() -> None:

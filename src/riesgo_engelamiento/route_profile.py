@@ -83,6 +83,11 @@ class RouteIcingProfileProduct:
             "severity_formula": self.severity_formula,
             "source_metrics": self.source_metrics,
             "contract": self.contract.to_dict(),
+            "visualBands": [
+                {"label": "Bajo", "start": 0.0, "end": 0.33},
+                {"label": "Medio", "start": 0.33, "end": 0.66},
+                {"label": "Alto", "start": 0.66, "end": 1.0},
+            ],
         }
         if output_paths is not None:
             payload["outputs"] = {

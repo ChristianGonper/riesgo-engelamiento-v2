@@ -230,6 +230,11 @@ def build_cross_section_payload(
         "xAxisLabel": "Distancia acumulada (km)",
         "yAxisLabel": "eta_mid (nivel relativo)",
         "verticalExtent": "surface-to-maximum",
+        "visualBands": [
+            {"label": "Bajo", "start": 0.0, "end": 0.33},
+            {"label": "Medio", "start": 0.33, "end": 0.66},
+            {"label": "Alto", "start": 0.66, "end": 1.0},
+        ],
     }
 
 

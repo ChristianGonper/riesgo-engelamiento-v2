@@ -27,6 +27,18 @@ export type MapMetadata = {
   mapBounds: [[number, number], [number, number]]
 }
 
+export type CacheStatus = {
+  datasetPath: string
+  datasetId: string
+  cacheDir: string
+  cacheVersion: string
+  state: 'ready' | 'warming' | 'missing'
+  lastRecalculatedAt: string | null
+  metadataCached: boolean
+  artifactCount: number
+  availableTimes: Array<{ index: number; label: string }>
+}
+
 export type RiskMapPayload = {
   timeIndex: number
   timeLabel: string | null
@@ -62,6 +74,7 @@ export type CrossSectionPayload = {
   xAxisLabel: string
   yAxisLabel: string
   verticalExtent: string
+  visualBands?: Array<{ label: string; start: number; end: number }>
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
@@ -83,8 +96,33 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T
 }
 
+async function postJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST', signal })
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      if (payload.detail) {
+        detail = payload.detail
+      }
+    } catch {
+      // ignore invalid json error bodies
+    }
+    throw new Error(detail)
+  }
+  return (await response.json()) as T
+}
+
 export function fetchMapMetadata(signal?: AbortSignal) {
   return getJson<MapMetadata>('/api/map-metadata', signal)
+}
+
+export function fetchCacheStatus(signal?: AbortSignal) {
+  return getJson<CacheStatus>('/api/cache-status', signal)
+}
+
+export function recalculateCache(signal?: AbortSignal) {
+  return postJson<{ status: string; metadata: MapMetadata; cacheStatus: CacheStatus }>('/api/recalculate', signal)
 }
 
 export function fetchRiskMap(
