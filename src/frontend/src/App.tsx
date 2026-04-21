@@ -93,13 +93,25 @@ function App() {
   const mapLoadingRef = useRef(false)
   const crossSectionLoadingRef = useRef(false)
 
+  const handleRecalculate = async () => {
+    try {
+      setStatus('Actualizando cache...')
+      const payload = await recalculateCache()
+      setCacheStatus(payload.cacheStatus)
+      setMetadata(payload.metadata)
+      setStatus('Panel listo.')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Recalculo fallido')
+    }
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     fetchMapMetadata(controller.signal)
       .then((payload) => {
         setMetadata(payload)
         setVerticalOption(payload.verticalSelection.options[0]?.id ?? 'dominant')
-        setStatus('Selecciona modo, tiempo y ruta.')
+        setStatus('Panel listo. Ajusta modo, tiempo y ruta.')
       })
       .catch((error: Error) => {
         setStatus(error.message)
@@ -240,9 +252,9 @@ function App() {
 
       <div className="absolute left-8 top-8 z-20 flex w-[350px] flex-col gap-4 rounded-3xl p-6 frost-panel shadow-2xl">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.32em] text-info/80">Aeronautical Icing Console</p>
+          <p className="text-[10px] uppercase tracking-[0.32em] text-info/80">PLATAFORMA OPERATIVA</p>
           <h1 className="text-3xl font-semibold tracking-[0.1em]">Aerofrost</h1>
-          <p className="mt-2 text-sm text-white/60">Mapa operativo conectado al backend Python para riesgo y corte vertical de ruta.</p>
+          <p className="mt-2 text-sm text-white/60">Plataforma operativa de riesgo de engelamiento.</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
           {status}
@@ -250,29 +262,12 @@ function App() {
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/55">
           {cacheStatus ? `${cacheStatus.artifactCount} artefactos cacheados` : 'Cache sin estado'}
         </div>
-        <button
-          type="button"
-          className="rounded-2xl border border-info/30 bg-info/10 px-4 py-3 text-sm text-info transition hover:bg-info/20"
-          onClick={async () => {
-            try {
-              setStatus('Recalculando archivo...')
-              const payload = await recalculateCache()
-              setCacheStatus(payload.cacheStatus)
-              setMetadata(payload.metadata)
-              setStatus('Archivo listo.')
-            } catch (error) {
-              setStatus(error instanceof Error ? error.message : 'Recalculo fallido')
-            }
-          }}
-        >
-          Recalcular archivo
-        </button>
         <div className="text-xs tracking-[0.18em] text-white/45">CACHE {cacheLabel.toUpperCase()}</div>
       </div>
 
       <div className="absolute right-8 top-8 z-20 flex h-44 w-80 flex-col gap-3 rounded-3xl p-6 frost-panel shadow-2xl">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold tracking-[0.24em] text-white/70">AERODYNAMIC THREAT</span>
+          <span className="text-xs font-semibold tracking-[0.24em] text-white/70">PERFIL</span>
           <span
             className="rounded-full border px-3 py-1 text-[10px] font-bold tracking-[0.24em]"
             style={{ borderColor: threatColor, color: threatColor, boxShadow: `0 0 18px ${threatColor}66` }}
@@ -280,6 +275,7 @@ function App() {
             {threatLabel}
           </span>
         </div>
+        <div className="text-lg font-semibold tracking-[0.18em] text-white/88">Aerodynamic threat</div>
         <div className="flex flex-1 items-center justify-center">
           <svg viewBox="0 0 240 72" className="h-full w-full">
             <path
@@ -291,8 +287,8 @@ function App() {
           </svg>
         </div>
         <div className="flex items-center justify-between text-xs text-white/60">
-          <span>{riskMode === 'generic' ? 'Perfil generico' : 'Modo por flight level'}</span>
-          <span>{threatValue.toFixed(1)} / 100</span>
+          <span>{riskMode === 'generic' ? 'Perfil general' : 'Capa vertical activa'}</span>
+          <span>Severidad {threatValue.toFixed(1)}</span>
         </div>
       </div>
 
@@ -397,8 +393,18 @@ function App() {
         </div>
 
         <div className="flex items-center justify-between text-xs text-white/50">
-          <span>{mapError ?? (isMapLoading ? 'Cargando overlay del tiempo actual.' : 'Mapa alimentado por overlay real del backend.')}</span>
+          <span>{mapError ?? (isMapLoading ? 'Cargando overlay del tiempo actual.' : 'Mapa sincronizado con el overlay actual.')}</span>
           <span>{frameStatus}</span>
+        </div>
+        <div className="flex items-center justify-end gap-3 text-[11px] uppercase tracking-[0.2em] text-white/45">
+          <span>{cacheStatus?.lastRecalculatedAt ?? 'sin recalculo'}</span>
+          <button
+            type="button"
+            onClick={handleRecalculate}
+            className="rounded-full border border-white/12 bg-white/6 px-3 py-1.5 text-[10px] tracking-[0.22em] text-white/70 transition hover:bg-white/12 hover:text-white"
+          >
+            Recalcular archivo
+          </button>
         </div>
       </div>
 
