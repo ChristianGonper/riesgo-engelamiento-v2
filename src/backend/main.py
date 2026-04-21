@@ -11,6 +11,7 @@ if str(REPO_SRC) not in sys.path:
     sys.path.insert(0, str(REPO_SRC))
 
 from riesgo_engelamiento.config import DEFAULT_DATASET_NAME
+from riesgo_engelamiento.cache_store import IcingCacheStore
 from riesgo_engelamiento.dataset import open_dataset
 from riesgo_engelamiento.web_api import (
     build_cross_section_payload,
@@ -21,6 +22,7 @@ from riesgo_engelamiento.web_api import (
 app = FastAPI(title="Aero-Frost Icing Risk API")
 
 DATASET_PATH = Path(__file__).resolve().parents[2] / DEFAULT_DATASET_NAME
+CACHE_STORE = IcingCacheStore(DATASET_PATH)
 
 # Allow CORS for local development
 app.add_middleware(
@@ -48,7 +50,27 @@ def _load_dataset():
 @app.get("/api/map-metadata")
 async def map_metadata():
     with _load_dataset() as dataset:
-        return build_map_metadata(dataset, DATASET_PATH)
+        return CACHE_STORE.map_metadata(dataset, build_map_metadata)
+
+
+@app.get("/api/cache-status")
+async def cache_status():
+    with _load_dataset() as dataset:
+        return CACHE_STORE.build_status(dataset).to_dict()
+
+
+@app.post("/api/recalculate")
+async def recalculate_cache():
+    try:
+        with _load_dataset() as dataset:
+            metadata = CACHE_STORE.prime(dataset, build_map_metadata)
+            return {
+                "status": "recalculated",
+                "metadata": metadata,
+                "cacheStatus": CACHE_STORE.build_status(dataset).to_dict(),
+            }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/risk-map")
@@ -59,12 +81,17 @@ async def risk_map(
 ):
     try:
         with _load_dataset() as dataset:
-            return build_risk_map_payload(
-                dataset,
-                DATASET_PATH,
-                time_index=time_index,
-                mode=mode,
-                vertical_option=vertical_option,
+            cache_key = f"t{time_index}_m{mode}_v{vertical_option or 'none'}"
+            return CACHE_STORE.get_or_build(
+                "risk-map",
+                cache_key,
+                lambda: build_risk_map_payload(
+                    dataset,
+                    DATASET_PATH,
+                    time_index=time_index,
+                    mode=mode,
+                    vertical_option=vertical_option,
+                ),
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -81,15 +108,24 @@ async def cross_section(
 ):
     try:
         with _load_dataset() as dataset:
-            return build_cross_section_payload(
-                dataset,
-                DATASET_PATH,
-                time_index=time_index,
-                route_start_lat=route_start_lat,
-                route_start_lon=route_start_lon,
-                route_end_lat=route_end_lat,
-                route_end_lon=route_end_lon,
-                route_points=route_points,
+            cache_key = (
+                f"t{time_index}_"
+                f"{route_start_lat:.4f}_{route_start_lon:.4f}_"
+                f"{route_end_lat:.4f}_{route_end_lon:.4f}_p{route_points}"
+            )
+            return CACHE_STORE.get_or_build(
+                "cross-section",
+                cache_key,
+                lambda: build_cross_section_payload(
+                    dataset,
+                    DATASET_PATH,
+                    time_index=time_index,
+                    route_start_lat=route_start_lat,
+                    route_start_lon=route_start_lon,
+                    route_end_lat=route_end_lat,
+                    route_end_lon=route_end_lon,
+                    route_points=route_points,
+                ),
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

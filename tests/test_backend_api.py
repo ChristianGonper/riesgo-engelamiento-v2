@@ -9,6 +9,7 @@ import xarray as xr
 from fastapi import HTTPException
 
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
+from riesgo_engelamiento.cache_store import IcingCacheStore
 
 
 def _load_backend_main_module():
@@ -97,6 +98,11 @@ def test_map_metadata_reports_python_vertical_options(monkeypatch) -> None:
     backend_main = _load_backend_main_module()
     dataset = _build_backend_dataset()
     monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    monkeypatch.setattr(
+        backend_main,
+        "CACHE_STORE",
+        IcingCacheStore(backend_main.DATASET_PATH, Path.cwd() / "tmp-cache-for-tests"),
+    )
 
     payload = asyncio.run(backend_main.map_metadata())
     assert payload["timeCount"] == 2
@@ -108,6 +114,24 @@ def test_map_metadata_reports_python_vertical_options(monkeypatch) -> None:
         "middle",
         "lower",
     }
+
+
+def test_cache_status_and_recalculate_endpoint(monkeypatch) -> None:
+    backend_main = _load_backend_main_module()
+    dataset = _build_backend_dataset()
+    monkeypatch.setattr(backend_main, "_load_dataset", lambda: _DatasetContext(dataset))
+    monkeypatch.setattr(
+        backend_main,
+        "CACHE_STORE",
+        IcingCacheStore(backend_main.DATASET_PATH, Path.cwd() / "tmp-cache-for-tests"),
+    )
+
+    cache_status = asyncio.run(backend_main.cache_status())
+    recalculated = asyncio.run(backend_main.recalculate_cache())
+
+    assert cache_status["datasetPath"].endswith("wrfout_d01_2015-04-17_18_00_00_corte")
+    assert recalculated["status"] == "recalculated"
+    assert recalculated["cacheStatus"]["metadataCached"] is True
 
 
 def test_risk_map_supports_generic_and_band_modes(monkeypatch) -> None:

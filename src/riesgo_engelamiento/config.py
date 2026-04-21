@@ -5,6 +5,12 @@ from dataclasses import dataclass
 CORE_T0_K = 300.0
 DEFAULT_DATASET_NAME = "wrfout_d01_2015-04-17_18_00_00_corte"
 DEFAULT_OUTPUT_DIR_NAME = "outputs"
+CACHE_ROOT_DIR_NAME = "cache"
+CACHE_DERIVED_DIR_NAME = "derived"
+CACHE_MANIFEST_NAME = "manifest.json"
+CACHE_METADATA_NAME = "map_metadata.json"
+CACHE_STATUS_NAME = "cache_status.json"
+CACHE_VERSION = "v1"
 FINAL_PRODUCT_CANONICAL_OUTPUT_PREFIX = "presentation_final_deliverable"
 FINAL_PRODUCT_CANONICAL_OUTPUT_PURPOSE = "presentation/final-deliverable"
 FINAL_PRODUCT_LEGACY_OUTPUT_PREFIX = "presentation_final_product"
