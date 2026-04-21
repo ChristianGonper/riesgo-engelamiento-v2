@@ -12,13 +12,11 @@ import { Maximize2, Minimize2, Pause, Play } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
 import {
-  fetchCacheStatus,
   fetchCrossSection,
   fetchMapMetadata,
   fetchRiskMap,
   recalculateCache,
   type CrossSectionPayload,
-  type CacheStatus,
   type MapMetadata,
   type RiskMapPayload,
   type RiskMode,
@@ -27,14 +25,6 @@ import { CrossSectionHeatmap } from './CrossSectionHeatmap'
 
 type Point = [number, number]
 type RouteSelection = { p1: Point; p2: Point }
-
-function severityLabel(maxSeverity: number) {
-  if (maxSeverity >= 60) return 'SEVERE'
-  if (maxSeverity >= 40) return 'HIGH'
-  if (maxSeverity >= 20) return 'MODERATE'
-  if (maxSeverity > 0) return 'LOW'
-  return 'NONE'
-}
 
 function severityColor(maxSeverity: number) {
   if (maxSeverity >= 60) return '#FF1744'
@@ -81,7 +71,6 @@ function App() {
   const [route, setRoute] = useState<RouteSelection | null>(null)
   const [riskMap, setRiskMap] = useState<RiskMapPayload | null>(null)
   const [crossSection, setCrossSection] = useState<CrossSectionPayload | null>(null)
-  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
   const [isCrossSectionExpanded, setIsCrossSectionExpanded] = useState(false)
   const [isMapLoading, setIsMapLoading] = useState(false)
   const [isCrossSectionLoading, setIsCrossSectionLoading] = useState(false)
@@ -97,7 +86,6 @@ function App() {
     try {
       setStatus('Actualizando cache...')
       const payload = await recalculateCache()
-      setCacheStatus(payload.cacheStatus)
       setMetadata(payload.metadata)
       setStatus('Panel listo.')
     } catch (error) {
@@ -116,14 +104,6 @@ function App() {
       .catch((error: Error) => {
         setStatus(error.message)
       })
-    return () => controller.abort()
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchCacheStatus(controller.signal)
-      .then((payload) => setCacheStatus(payload))
-      .catch(() => setCacheStatus(null))
     return () => controller.abort()
   }, [])
 
@@ -215,9 +195,7 @@ function App() {
 
   const currentTimeLabel = metadata?.times[timeIndex]?.label ?? `t${timeIndex.toString().padStart(3, '0')}`
   const threatValue = riskMap?.severityRange[1] ?? 0
-  const threatLabel = severityLabel(threatValue)
   const threatColor = severityColor(threatValue)
-  const cacheLabel = cacheStatus?.state ?? 'missing'
   const frameStatus = isMapLoading
     ? 'Cargando frame de mapa...'
     : isCrossSectionLoading
@@ -260,22 +238,11 @@ function App() {
           {status}
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/55">
-          {cacheStatus ? `${cacheStatus.artifactCount} artefactos cacheados` : 'Cache sin estado'}
+          Panel listo para explorar.
         </div>
-        <div className="text-xs tracking-[0.18em] text-white/45">CACHE {cacheLabel.toUpperCase()}</div>
       </div>
 
-      <div className="absolute right-8 top-8 z-20 flex h-44 w-80 flex-col gap-3 rounded-3xl p-6 frost-panel shadow-2xl">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold tracking-[0.24em] text-white/70">PERFIL</span>
-          <span
-            className="rounded-full border px-3 py-1 text-[10px] font-bold tracking-[0.24em]"
-            style={{ borderColor: threatColor, color: threatColor, boxShadow: `0 0 18px ${threatColor}66` }}
-          >
-            {threatLabel}
-          </span>
-        </div>
-        <div className="text-lg font-semibold tracking-[0.18em] text-white/88">Aerodynamic threat</div>
+      <div className="absolute right-8 top-8 z-20 flex h-44 w-80 flex-col justify-center gap-3 rounded-3xl p-6 frost-panel shadow-2xl">
         <div className="flex flex-1 items-center justify-center">
           <svg viewBox="0 0 240 72" className="h-full w-full">
             <path
@@ -285,10 +252,6 @@ function App() {
               strokeWidth={threatValue >= 60 ? 4 : 3}
             />
           </svg>
-        </div>
-        <div className="flex items-center justify-between text-xs text-white/60">
-          <span>{riskMode === 'generic' ? 'Perfil general' : 'Capa vertical activa'}</span>
-          <span>Severidad {threatValue.toFixed(1)}</span>
         </div>
       </div>
 
@@ -365,13 +328,6 @@ function App() {
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-white/45">
-          <span>
-            Cache {cacheStatus?.state ?? 'missing'}{isMapLoading ? ' · mapa' : ''}{isCrossSectionLoading ? ' · corte' : ''}
-          </span>
-          <span>{cacheStatus?.lastRecalculatedAt ?? 'sin recalculo'}</span>
-        </div>
-
         <div className="grid grid-cols-[auto_auto_1fr] items-center gap-4">
           <button
             type="button"
@@ -397,7 +353,7 @@ function App() {
           <span>{frameStatus}</span>
         </div>
         <div className="flex items-center justify-end gap-3 text-[11px] uppercase tracking-[0.2em] text-white/45">
-          <span>{cacheStatus?.lastRecalculatedAt ?? 'sin recalculo'}</span>
+          <span>{isMapLoading ? 'Actualizando mapa' : isCrossSectionLoading ? 'Actualizando corte' : 'Listo'}</span>
           <button
             type="button"
             onClick={handleRecalculate}
