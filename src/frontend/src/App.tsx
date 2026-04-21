@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { MapContainer, TileLayer, Polygon, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
