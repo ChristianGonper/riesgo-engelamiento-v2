@@ -2,6 +2,7 @@
 
 @theme {
   --color-dark: #080A10;
+  --color-dark-soft: #0f1728;
   --color-frost: rgba(255, 255, 255, 0.03);
   --color-frost-border: rgba(255, 255, 255, 0.1);
   --color-safe: #00E676;
@@ -13,10 +14,18 @@
   --font-telemetry: 'Roboto Mono', monospace;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-dark);
+  background:
+    radial-gradient(circle at top, rgba(0, 176, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, #030711 0%, #07111f 100%);
   color: white;
   font-family: var(--font-ui);
 }
@@ -27,4 +36,44 @@ body {
   border: 1px solid var(--color-frost-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+}
+
+.aerofrost-range {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+}
+
+.aerofrost-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 176, 255, 0.88), rgba(0, 230, 118, 0.88));
+}
+
+.aerofrost-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  background: #08111f;
+  box-shadow: 0 0 18px rgba(0, 176, 255, 0.5);
+}
+
+.aerofrost-range::-moz-range-track {
+  height: 4px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 176, 255, 0.88), rgba(0, 230, 118, 0.88));
+}
+
+.aerofrost-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  background: #08111f;
+  box-shadow: 0 0 18px rgba(0, 176, 255, 0.5);
 }

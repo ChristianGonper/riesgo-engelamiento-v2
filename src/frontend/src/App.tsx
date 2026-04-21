@@ -1,188 +1,349 @@
-import { useState } from 'react';
-import { Play, Pause } from 'lucide-react';
-import { MapContainer, TileLayer, Polygon, Polyline, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CircleMarker,
+  ImageOverlay,
+  MapContainer,
+  Polyline,
+  TileLayer,
+  useMapEvents,
+} from 'react-leaflet'
+import type { LatLngBoundsExpression } from 'leaflet'
+import { Maximize2, Minimize2, Pause, Play } from 'lucide-react'
+import 'leaflet/dist/leaflet.css'
 
-// Type definitions
-type Point = [number, number];
+import {
+  fetchCrossSection,
+  fetchMapMetadata,
+  fetchRiskMap,
+  type CrossSectionPayload,
+  type MapMetadata,
+  type RiskMapPayload,
+  type RiskMode,
+} from './api'
+import { CrossSectionHeatmap } from './CrossSectionHeatmap'
 
-function MapClickHandler({ onPointsSelected }: { onPointsSelected: (p1: Point, p2: Point) => void }) {
-  const [points, setPoints] = useState<Point[]>([]);
+type Point = [number, number]
+type RouteSelection = { p1: Point; p2: Point }
+
+function severityLabel(maxSeverity: number) {
+  if (maxSeverity >= 60) return 'SEVERE'
+  if (maxSeverity >= 40) return 'HIGH'
+  if (maxSeverity >= 20) return 'MODERATE'
+  if (maxSeverity > 0) return 'LOW'
+  return 'NONE'
+}
+
+function severityColor(maxSeverity: number) {
+  if (maxSeverity >= 60) return '#FF1744'
+  if (maxSeverity >= 40) return '#FF7A18'
+  if (maxSeverity >= 20) return '#FFD600'
+  if (maxSeverity > 0) return '#00E676'
+  return '#7dd3fc'
+}
+
+function MapClickHandler({ onRouteChange }: { onRouteChange: (route: RouteSelection) => void }) {
+  const [points, setPoints] = useState<Point[]>([])
 
   useMapEvents({
-    click(e) {
-      const newPoints = [...points, [e.latlng.lat, e.latlng.lng] as Point];
-      if (newPoints.length > 2) {
-        newPoints.shift();
-      }
-      setPoints(newPoints);
-      if (newPoints.length === 2) {
-        onPointsSelected(newPoints[0], newPoints[1]);
+    click(event) {
+      const nextPoints = [...points, [event.latlng.lat, event.latlng.lng] as Point].slice(-2)
+      setPoints(nextPoints)
+      if (nextPoints.length === 2) {
+        onRouteChange({ p1: nextPoints[0], p2: nextPoints[1] })
       }
     },
-  });
+  })
 
   return (
     <>
-      {points.map((p, i) => (
-        <Polygon key={i} positions={[p]} />
+      {points.map((point, index) => (
+        <CircleMarker
+          key={`${point[0]}-${point[1]}-${index}`}
+          center={point}
+          radius={6}
+          pathOptions={{ color: '#00B0FF', fillColor: '#00B0FF', fillOpacity: 0.9, weight: 2 }}
+        />
       ))}
-      {points.length === 2 && <Polyline positions={points} color="#00B0FF" weight={3} />}
+      {points.length === 2 ? <Polyline positions={points} color="#00B0FF" weight={3} /> : null}
     </>
-  );
+  )
 }
 
 function App() {
-  const [altitude, setAltitude] = useState(150);
-  const [time, setTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [route, setRoute] = useState<{ p1: Point; p2: Point } | null>(null);
+  const [metadata, setMetadata] = useState<MapMetadata | null>(null)
+  const [riskMode, setRiskMode] = useState<RiskMode>('generic')
+  const [verticalOption, setVerticalOption] = useState<string>('dominant')
+  const [timeIndex, setTimeIndex] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [route, setRoute] = useState<RouteSelection | null>(null)
+  const [riskMap, setRiskMap] = useState<RiskMapPayload | null>(null)
+  const [crossSection, setCrossSection] = useState<CrossSectionPayload | null>(null)
+  const [isCrossSectionExpanded, setIsCrossSectionExpanded] = useState(false)
+  const [status, setStatus] = useState<string>('Cargando Aerofrost...')
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [crossSectionError, setCrossSectionError] = useState<string | null>(null)
 
-  const formatTime = (t: number) => {
-    const hours = Math.floor(t) + 12;
-    return `${hours.toString().padStart(2, '0')}:00Z`;
-  };
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchMapMetadata(controller.signal)
+      .then((payload) => {
+        setMetadata(payload)
+        setVerticalOption(payload.verticalSelection.options[0]?.id ?? 'dominant')
+        setStatus('Selecciona modo, tiempo y ruta.')
+      })
+      .catch((error: Error) => {
+        setStatus(error.message)
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!metadata || !isPlaying || metadata.timeCount <= 1) return undefined
+    const timer = window.setInterval(() => {
+      setTimeIndex((current) => (current + 1) % metadata.timeCount)
+    }, 1400)
+    return () => window.clearInterval(timer)
+  }, [isPlaying, metadata])
+
+  useEffect(() => {
+    if (!metadata) return
+    const controller = new AbortController()
+    setMapError(null)
+    fetchRiskMap(timeIndex, riskMode, riskMode === 'flight-level' ? verticalOption : null, controller.signal)
+      .then((payload) => {
+        setRiskMap(payload)
+      })
+      .catch((error: Error) => {
+        if (error.name !== 'AbortError') {
+          setMapError(error.message)
+        }
+      })
+    return () => controller.abort()
+  }, [metadata, riskMode, timeIndex, verticalOption])
+
+  useEffect(() => {
+    if (!route) {
+      setCrossSection(null)
+      setCrossSectionError(null)
+      return
+    }
+    const controller = new AbortController()
+    setCrossSectionError(null)
+    fetchCrossSection(
+      {
+        timeIndex,
+        routeStartLat: route.p1[0],
+        routeStartLon: route.p1[1],
+        routeEndLat: route.p2[0],
+        routeEndLon: route.p2[1],
+        routePoints: 160,
+      },
+      controller.signal,
+    )
+      .then((payload) => {
+        setCrossSection(payload)
+      })
+      .catch((error: Error) => {
+        if (error.name !== 'AbortError') {
+          setCrossSectionError(error.message)
+        }
+      })
+    return () => controller.abort()
+  }, [route, timeIndex])
+
+  const bounds = useMemo<LatLngBoundsExpression | undefined>(() => {
+    const sourceBounds = riskMap?.bounds ?? metadata?.mapBounds
+    return sourceBounds as LatLngBoundsExpression | undefined
+  }, [metadata, riskMap])
+
+  const currentTimeLabel = metadata?.times[timeIndex]?.label ?? `t${timeIndex.toString().padStart(3, '0')}`
+  const threatValue = riskMap?.severityRange[1] ?? 0
+  const threatLabel = severityLabel(threatValue)
+  const threatColor = severityColor(threatValue)
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-dark text-white font-ui selection:bg-info/30">
-      {/* Base Map */}
+    <div className="relative h-screen w-screen overflow-hidden bg-dark text-white selection:bg-info/30">
       <div className="absolute inset-0 z-0">
         <MapContainer
-          center={[40.4168, -3.7038]} // Madrid as default
-          zoom={5}
-          className="w-full h-full bg-[#080A10]"
+          bounds={bounds}
+          center={[40.4168, -3.7038]}
+          zoom={6}
+          className="h-full w-full bg-[#080A10]"
           zoomControl={false}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
-          <MapClickHandler onPointsSelected={(p1, p2) => setRoute({ p1, p2 })} />
-          
-          {/* Mock Risk Overlay - Red polygon for severe risk */}
-          <Polygon positions={[[42,-4], [43,-2], [41,0]]} pathOptions={{ color: '#FF1744', fillColor: '#FF1744', fillOpacity: 0.4, weight: 1 }} />
-          {/* Yellow polygon for caution */}
-          <Polygon positions={[[39,-6], [40,-5], [38,-3]]} pathOptions={{ color: '#FFD600', fillColor: '#FFD600', fillOpacity: 0.4, weight: 1 }} />
+          {riskMap ? (
+            <ImageOverlay url={riskMap.overlayImage} bounds={riskMap.bounds as LatLngBoundsExpression} opacity={0.86} />
+          ) : null}
+          <MapClickHandler onRouteChange={setRoute} />
+          {route ? <Polyline positions={[route.p1, route.p2]} color="#8BE9FD" weight={4} /> : null}
         </MapContainer>
       </div>
 
-      {/* Header Panel */}
-      <div className="absolute top-8 left-8 z-10 w-90 flex flex-col gap-4 frost-panel rounded-2xl p-6 shadow-2xl">
-        <h1 className="text-2xl font-bold tracking-[0.2em]">AERO-FROST</h1>
-        <h2 className="text-xs font-telemetry text-white/60 tracking-wider">ICING RISK TELEMETRY</h2>
+      <div className="absolute inset-x-0 top-0 z-10 h-36 bg-[radial-gradient(circle_at_top,rgba(0,176,255,0.18),transparent_58%)]" />
+
+      <div className="absolute left-8 top-8 z-20 flex w-[350px] flex-col gap-4 rounded-3xl p-6 frost-panel shadow-2xl">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.32em] text-info/80">Aeronautical Icing Console</p>
+          <h1 className="text-3xl font-semibold tracking-[0.1em]">Aerofrost</h1>
+          <p className="mt-2 text-sm text-white/60">Mapa operativo conectado al backend Python para riesgo y corte vertical de ruta.</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
+          {status}
+        </div>
       </div>
 
-      {/* NACA Panel */}
-      <div className="absolute top-8 right-8 z-10 w-72 h-44 flex flex-col gap-2 frost-panel rounded-2xl p-6 shadow-2xl">
-        <div className="flex flex-row items-center justify-between w-full">
-          <span className="text-xs font-bold">AERODYNAMIC THREAT</span>
-          <div className="bg-severe/20 border border-severe rounded px-2 py-1 shadow-[0_0_10px_rgba(255,23,68,0.8)]">
-            <span className="text-[10px] font-telemetry font-bold text-severe">SEVERE</span>
-          </div>
+      <div className="absolute right-8 top-8 z-20 flex h-44 w-80 flex-col gap-3 rounded-3xl p-6 frost-panel shadow-2xl">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold tracking-[0.24em] text-white/70">AERODYNAMIC THREAT</span>
+          <span
+            className="rounded-full border px-3 py-1 text-[10px] font-bold tracking-[0.24em]"
+            style={{ borderColor: threatColor, color: threatColor, boxShadow: `0 0 18px ${threatColor}66` }}
+          >
+            {threatLabel}
+          </span>
         </div>
-        <div className="flex-1 w-full flex items-center justify-center relative">
-          <svg viewBox="0 0 200 60" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,23,68,0.5)]">
+        <div className="flex flex-1 items-center justify-center">
+          <svg viewBox="0 0 240 72" className="h-full w-full">
             <path
-              d="M0 30 Q 50 0 200 30 Q 50 60 0 30"
-              fill="rgba(255,23,68,0.2)"
-              stroke="#FF1744"
-              strokeWidth="3"
+              d="M6 36 Q 76 2 230 36 Q 76 70 6 36"
+              fill={`${threatColor}22`}
+              stroke={threatColor}
+              strokeWidth={threatValue >= 60 ? 4 : 3}
             />
           </svg>
         </div>
+        <div className="flex items-center justify-between text-xs text-white/60">
+          <span>{riskMode === 'generic' ? 'Perfil generico' : 'Modo por flight level'}</span>
+          <span>{threatValue.toFixed(1)} / 100</span>
+        </div>
       </div>
 
-      {/* Cross Section Panel */}
-      <div className="absolute bottom-8 right-8 z-10 w-[568px] h-[368px] flex flex-col frost-panel rounded-2xl p-6 shadow-2xl">
-        <div className="flex flex-row w-full items-center justify-between mb-4">
-          <span className="text-sm font-bold">ROUTE CROSS-SECTION</span>
-          {route ? (
-            <span className="text-xs font-telemetry text-white/60">
-              FL{altitude} - {Math.round(Math.random()*100 + 200)}NM
-            </span>
+      <div className="absolute bottom-8 right-8 z-20 flex h-[380px] w-[600px] flex-col gap-4 rounded-3xl p-6 frost-panel shadow-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] text-white/80">ROUTE CROSS-SECTION</p>
+            <p className="mt-1 text-xs text-white/55">
+              {route ? `${currentTimeLabel} · ${crossSection?.distance_km_total.toFixed(1) ?? '--'} km` : 'Haz clic en dos puntos del mapa'}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-white/10 bg-white/6 p-2 text-white/70 transition hover:bg-white/12"
+            onClick={() => setIsCrossSectionExpanded((current) => !current)}
+          >
+            {isCrossSectionExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          {crossSectionError ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-severe/40 bg-severe/10 text-sm text-severe">
+              {crossSectionError}
+            </div>
           ) : (
-            <span className="text-xs font-telemetry text-white/60">CLICK 2 POINTS</span>
+            <CrossSectionHeatmap payload={crossSection} />
           )}
         </div>
-        <div className="flex-1 w-full rounded-lg border border-white/10 bg-black/40 overflow-hidden relative">
-          {/* Mock chart background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-safe/10 to-caution/40 opacity-50" />
-          
-          {/* Mock Chart SVG */}
-          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 520 260">
-            {route ? (
-               <path d="M0 260 L100 180 L250 120 L350 20 L520 100" stroke="#FFD600" strokeWidth="2" fill="none" />
-            ) : (
-               <text x="50%" y="50%" textAnchor="middle" fill="rgba(255,255,255,0.3)" className="font-telemetry text-sm">AWAITING ROUTE</text>
-            )}
-          </svg>
-        </div>
       </div>
 
-      {/* Controls Panel */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 w-[600px] flex flex-col gap-5 frost-panel rounded-3xl p-6 shadow-2xl">
-        
-        {/* Altitude Row */}
-        <div className="flex flex-row items-center w-full gap-4">
-          <span className="text-sm font-telemetry text-white/60">FL</span>
-          <span className="text-sm font-telemetry font-bold text-info w-8">{altitude}</span>
-          <div className="flex-1 relative h-6 flex items-center group cursor-pointer">
-            <input
-              type="range"
-              min="0"
-              max="400"
-              step="10"
-              value={altitude}
-              onChange={(e) => setAltitude(parseInt(e.target.value))}
-              className="absolute w-full h-full opacity-0 cursor-pointer z-20"
-            />
-            <div className="w-full h-1 bg-white/10 rounded-full relative z-0">
-              <div 
-                className="absolute top-0 left-0 h-full bg-info rounded-full" 
-                style={{ width: `${(altitude / 400) * 100}%` }}
-              />
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-info rounded-full shadow-[0_0_10px_rgba(0,176,255,0.5)]"
-                style={{ left: `calc(${(altitude / 400) * 100}% - 8px)` }}
-              />
-            </div>
+      <div className="absolute bottom-8 left-1/2 z-20 flex w-[720px] -translate-x-1/2 flex-col gap-5 rounded-[28px] p-6 frost-panel shadow-2xl">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+          <span className="text-xs tracking-[0.24em] text-white/55">MODE</span>
+          <div className="flex gap-2">
+            {metadata?.riskModes.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setRiskMode(mode.id)}
+                className={`rounded-full px-4 py-2 text-xs tracking-[0.18em] transition ${
+                  riskMode === mode.id
+                    ? 'bg-info text-black shadow-[0_0_18px_rgba(0,176,255,0.35)]'
+                    : 'bg-white/8 text-white/70 hover:bg-white/14'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
           </div>
+          <span className="text-right text-xs text-white/45">{riskMap?.resolvedVerticalOption ?? 'all levels'}</span>
         </div>
 
-        {/* Time Row */}
-        <div className="flex flex-row items-center w-full gap-4">
-          <button 
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-            onClick={() => setIsPlaying(!isPlaying)}
+        {riskMode === 'flight-level' ? (
+          <div className="grid grid-cols-[auto_1fr] items-center gap-4">
+            <span className="text-xs tracking-[0.24em] text-white/55">FL/BAND</span>
+            <select
+              value={verticalOption}
+              onChange={(event) => setVerticalOption(event.target.value)}
+              className="rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white outline-none"
+            >
+              {metadata?.verticalSelection.options.map((option) => (
+                <option key={option.id} value={option.id} className="bg-[#07111f] text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-[auto_auto_1fr] items-center gap-4">
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/18"
+            onClick={() => setIsPlaying((current) => !current)}
           >
-            {isPlaying ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" />}
+            {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" />}
           </button>
-          <span className="text-sm font-telemetry font-bold w-14">{formatTime(time)}</span>
-          <div className="flex-1 relative h-6 flex items-center group cursor-pointer">
-             <input
-              type="range"
-              min="0"
-              max="24"
-              step="1"
-              value={time}
-              onChange={(e) => setTime(parseInt(e.target.value))}
-              className="absolute w-full h-full opacity-0 cursor-pointer z-20"
-            />
-            <div className="w-full h-1 bg-white/10 rounded-full relative z-0">
-              <div 
-                className="absolute top-0 left-0 h-full bg-safe rounded-full" 
-                style={{ width: `${(time / 24) * 100}%` }}
-              />
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-safe rounded-full shadow-[0_0_10px_rgba(0,230,118,0.5)]"
-                style={{ left: `calc(${(time / 24) * 100}% - 8px)` }}
-              />
+          <span className="w-32 text-sm font-medium text-white/80">{currentTimeLabel}</span>
+          <input
+            type="range"
+            min={0}
+            max={Math.max((metadata?.timeCount ?? 1) - 1, 0)}
+            step={1}
+            value={timeIndex}
+            onChange={(event) => setTimeIndex(Number(event.target.value))}
+            className="aerofrost-range"
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-white/50">
+          <span>{mapError ?? 'Mapa alimentado por overlay real del backend.'}</span>
+          <span>{route ? 'Ruta activa sincronizada con el tiempo.' : 'Selecciona dos puntos para obtener el corte vertical.'}</span>
+        </div>
+      </div>
+
+      {isCrossSectionExpanded ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/72 p-10 backdrop-blur-sm">
+          <div className="flex h-full w-full max-w-6xl flex-col gap-5 rounded-[32px] p-7 frost-panel shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold tracking-[0.24em] text-white/80">ROUTE CROSS-SECTION · EXPANDED</p>
+                <p className="mt-1 text-xs text-white/55">
+                  {route ? `${currentTimeLabel} · ${crossSection?.distance_km_total.toFixed(1) ?? '--'} km` : 'Sin ruta activa'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/10 bg-white/6 p-3 text-white/70 transition hover:bg-white/12"
+                onClick={() => setIsCrossSectionExpanded(false)}
+              >
+                <Minimize2 size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              {crossSectionError ? (
+                <div className="flex h-full items-center justify-center rounded-2xl border border-severe/40 bg-severe/10 text-sm text-severe">
+                  {crossSectionError}
+                </div>
+              ) : (
+                <CrossSectionHeatmap payload={crossSection} expanded />
+              )}
             </div>
           </div>
         </div>
-
-      </div>
-
+      ) : null}
     </div>
   )
 }

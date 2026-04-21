@@ -24,9 +24,11 @@ Para lanzarla:
    *(La interfaz web estará disponible en la URL indicada por Vite, usualmente `http://localhost:5173`)*
 
 Una vez abierta la interfaz web:
-- **Mapa:** Puedes explorar visualmente las zonas (rojo = severo, amarillo = moderado, etc.).
-- **Panel de control:** Usa los sliders de la parte inferior para seleccionar la altitud (FL) y la hora de pronóstico.
-- **Cross-Section:** Haz clic en dos puntos diferentes del mapa para generar una línea de ruta. El panel inferior derecho mostrará automáticamente el corte transversal (perfil vertical) entre ambos puntos.
+- **Mapa:** Puedes explorar visualmente las zonas con overlay real servido por el backend.
+- **Modo de riesgo:** Alterna entre `Perfil generico` (máximo vertical por columna) y `Por flight level`, que sigue las franjas verticales disponibles en Python.
+- **Panel de control:** Usa la línea temporal inferior para seleccionar o reproducir automáticamente la hora de pronóstico.
+- **Cross-Section:** Haz clic en dos puntos diferentes del mapa para generar una línea de ruta. El panel inferior derecho mostrará automáticamente el corte transversal real entre ambos puntos, desde superficie hasta el nivel máximo del modelo.
+- **Vista ampliada:** El cross-section puede ampliarse para inspección detallada.
 - **Threat Indicator:** El indicador NACA en la esquina superior derecha cambiará dinámicamente mostrando la amenaza aerodinámica máxima detectada.
 
 ## Commands
