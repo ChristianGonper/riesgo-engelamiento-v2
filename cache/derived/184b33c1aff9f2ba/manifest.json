@@ -1,0 +1,17 @@
+{
+  "datasetPath": "C:\\Users\\chris\\Documents\\Universidad\\METEO\\riesgo-engelamiento\\wrfout_d01_2015-04-17_18_00_00_corte",
+  "datasetId": "184b33c1aff9f2ba",
+  "cacheVersion": "v1",
+  "generatedAt": "2026-04-21T18:37:00.400965Z",
+  "timeCount": 2,
+  "times": [
+    {
+      "index": 0,
+      "label": "2015-04-17T18:00:00"
+    },
+    {
+      "index": 1,
+      "label": "2015-04-17T21:00:00"
+    }
+  ]
+}

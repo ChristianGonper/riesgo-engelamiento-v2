@@ -1,73 +1,35 @@
-# React + TypeScript + Vite
+# Aerofrost Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Cliente React + TypeScript + Vite para la interfaz interactiva de riesgo de engelamiento.
 
-Currently, two official plugins are available:
+## Estado actual
+- Consume la API FastAPI del backend.
+- Muestra overlays de riesgo sobre el mapa.
+- Permite cambiar tiempo, modo y banda vertical del mapa.
+- Genera cross-sections seleccionando dos puntos sobre el mapa.
+- Muestra estado de cache y permite lanzar `Recalcular archivo`.
+- La reproducción temporal evita solapar requests mientras hay cargas activas.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Scripts
+- `npm run dev`: arranca el entorno de desarrollo.
+- `npm run build`: compila TypeScript y genera `dist/`.
+- `npm run preview`: sirve la build local.
+- `npm run lint`: ejecuta ESLint.
 
-## React Compiler
+## Desarrollo local
+1. Instala dependencias: `npm install`
+2. Arranca el backend en `http://127.0.0.1:8000`
+3. Inicia el frontend: `npm run dev`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Por defecto el cliente usa `VITE_API_BASE_URL` o `http://127.0.0.1:8000`.
 
-## Expanding the ESLint configuration
+## Estructura
+- `src/App.tsx`: layout principal, estado de app, playback y sincronización con la API.
+- `src/api.ts`: contratos TypeScript y llamadas HTTP.
+- `src/CrossSectionHeatmap.tsx`: render del perfil vertical.
+- `src/index.css`: tema visual y utilidades base.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Notas
+- El modo `flight-level` afecta solo al mapa horizontal.
+- El perfil vertical mantiene `surface-to-maximum` y referencias `Bajo / Medio / Alto`.
+- La UI asume un dataset activo único servido por el backend actual.

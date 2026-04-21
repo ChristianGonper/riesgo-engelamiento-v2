@@ -1,0 +1,43 @@
+{
+  "timeIndex": 0,
+  "timeLabel": "2015-04-17T18:00:00",
+  "mode": "flight-level",
+  "verticalOption": "lower",
+  "resolvedVerticalOption": "lower",
+  "bounds": [
+    [
+      40.0,
+      -3.0
+    ],
+    [
+      41.0,
+      -2.0
+    ]
+  ],
+  "gridShape": [
+    3,
+    3
+  ],
+  "severityRange": [
+    10.0,
+    100.0
+  ],
+  "overlayImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAOnRFWHRTb2Z0d2FyZQBNYXRwbG90bGliIHZlcnNpb24zLjEwLjgsIGh0dHBzOi8vbWF0cGxvdGxpYi5vcmcvwVt1zgAAAAlwSFlzAAAPYQAAD2EBqD+naQAAACFJREFUeJxj/P1n/x5JwTIGEGAU4TXdA2YxMDAwwRggGgCrGgUpNz6/pgAAAABJRU5ErkJggg==",
+  "latitudes": [
+    40.0,
+    40.5,
+    41.0
+  ],
+  "longitudes": [
+    -3.0,
+    -2.5,
+    -2.0
+  ],
+  "severityFormula": "100 * (0.50*risk_presence + 0.25*liquid_presence + 0.15*mixed_phase + 0.10*coherence)",
+  "sourceMetrics": {
+    "phase6_severity_class": "moderate",
+    "phase6_severity_score": 31.666669845581055,
+    "phase6_dominant_band": "lower",
+    "phase6_persistence_fraction": 1.0
+  }
+}

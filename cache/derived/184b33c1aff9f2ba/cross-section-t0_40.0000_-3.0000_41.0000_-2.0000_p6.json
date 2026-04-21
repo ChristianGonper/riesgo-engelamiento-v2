@@ -1,0 +1,134 @@
+{
+  "artifact_kind": "presentation/route-icing-profile",
+  "output_purpose": "presentation/route-icing-profile",
+  "dataset_path": "C:\\Users\\chris\\Documents\\Universidad\\METEO\\riesgo-engelamiento\\wrfout_d01_2015-04-17_18_00_00_corte",
+  "selected_time_index": 0,
+  "selected_time_label": "2015-04-17T18:00:00",
+  "route_start": [
+    40.0,
+    -3.0
+  ],
+  "route_end": [
+    41.0,
+    -2.0
+  ],
+  "route_point_count": 6,
+  "distance_km_total": 139.6905517578125,
+  "distance_km": [
+    0.0,
+    27.999073028564453,
+    55.96773147583008,
+    83.9059066772461,
+    111.81353759765625,
+    139.6905517578125
+  ],
+  "route_lat": [
+    40.0,
+    40.20000076293945,
+    40.400001525878906,
+    40.599998474121094,
+    40.79999923706055,
+    41.0
+  ],
+  "route_lon": [
+    -3.0,
+    -2.799999952316284,
+    -2.5999999046325684,
+    -2.4000000953674316,
+    -2.200000047683716,
+    -2.0
+  ],
+  "vertical_levels": 3,
+  "eta_mid": [
+    0.8300000429153442,
+    0.4950000047683716,
+    0.16500000655651093
+  ],
+  "profile_shape": [
+    3,
+    6
+  ],
+  "profile": [
+    [
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      40.0,
+      40.0
+    ],
+    [
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0
+    ],
+    [
+      100.0,
+      100.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0
+    ]
+  ],
+  "severity_range": [
+    10.0,
+    100.0
+  ],
+  "severity_formula": "100 * (0.50*risk_presence + 0.25*liquid_presence + 0.15*mixed_phase + 0.10*coherence)",
+  "source_metrics": {
+    "phase6_severity_class": "moderate",
+    "phase6_severity_score": 31.666669845581055,
+    "phase6_dominant_band": "lower",
+    "phase6_persistence_fraction": 1.0,
+    "domain_longitude_min": -3.0,
+    "domain_longitude_max": -2.0,
+    "domain_latitude_min": 40.0,
+    "domain_latitude_max": 41.0,
+    "profile_severity_mean": 23.33333396911621
+  },
+  "contract": {
+    "artifact_kind": "presentation/route-icing-profile",
+    "output_prefix": "route_icing_profile",
+    "required_metadata_fields": [
+      "artifact_kind",
+      "output_purpose",
+      "dataset_path",
+      "selected_time_index",
+      "selected_time_label",
+      "route_start",
+      "route_end",
+      "route_point_count",
+      "distance_km_total",
+      "vertical_levels",
+      "profile_shape",
+      "severity_range",
+      "severity_formula",
+      "source_metrics",
+      "outputs"
+    ]
+  },
+  "xAxisLabel": "Distancia acumulada (km)",
+  "yAxisLabel": "eta_mid (nivel relativo)",
+  "verticalExtent": "surface-to-maximum",
+  "visualBands": [
+    {
+      "label": "Bajo",
+      "start": 0.0,
+      "end": 0.33
+    },
+    {
+      "label": "Medio",
+      "start": 0.33,
+      "end": 0.66
+    },
+    {
+      "label": "Alto",
+      "start": 0.66,
+      "end": 1.0
+    }
+  ]
+}

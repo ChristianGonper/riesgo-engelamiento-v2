@@ -1,0 +1,72 @@
+{
+  "datasetPath": "C:\\Users\\chris\\Documents\\Universidad\\METEO\\riesgo-engelamiento\\wrfout_d01_2015-04-17_18_00_00_corte",
+  "timeCount": 2,
+  "times": [
+    {
+      "index": 0,
+      "label": "2015-04-17T18:00:00"
+    },
+    {
+      "index": 1,
+      "label": "2015-04-17T21:00:00"
+    }
+  ],
+  "riskModes": [
+    {
+      "id": "generic",
+      "label": "Perfil generico"
+    },
+    {
+      "id": "flight-level",
+      "label": "Por flight level"
+    }
+  ],
+  "verticalSelection": {
+    "kind": "python-band",
+    "label": "Franjas verticales derivadas del pipeline Python",
+    "options": [
+      {
+        "id": "dominant",
+        "label": "Franja dominante",
+        "kind": "band",
+        "etaMin": null,
+        "etaMax": null,
+        "levelCount": 1
+      },
+      {
+        "id": "upper",
+        "label": "Upper relative eta band of the model-level stack",
+        "kind": "band",
+        "etaMin": 0.66,
+        "etaMax": 1.0,
+        "levelCount": 1
+      },
+      {
+        "id": "middle",
+        "label": "Middle relative eta band of the model-level stack",
+        "kind": "band",
+        "etaMin": 0.33,
+        "etaMax": 0.66,
+        "levelCount": 1
+      },
+      {
+        "id": "lower",
+        "label": "Lower relative eta band of the model-level stack",
+        "kind": "band",
+        "etaMin": 0.0,
+        "etaMax": 0.33,
+        "levelCount": 1
+      }
+    ]
+  },
+  "mapBounds": [
+    [
+      40.0,
+      -3.0
+    ],
+    [
+      41.0,
+      -2.0
+    ]
+  ]
+}

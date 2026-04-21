@@ -1,70 +1,78 @@
 # Riesgo de Engelamiento
 
-Pipeline reproducible en Python para validar una salida WRF, documentar sus limitaciones y preparar las fases posteriores del análisis de engelamiento.
+Proyecto Python + FastAPI + React para analizar un NetCDF WRF fijo, generar productos de riesgo de engelamiento y explorar el resultado en la interfaz interactiva `Aerofrost`.
+
+## Estado actual
+- El pipeline CLI valida el dataset y genera artefactos reproducibles de fases 1, 2, 5 y 6.
+- El backend sirve `map-metadata`, `risk-map` y `cross-section` desde cache persistida en disco.
+- El recálculo ya no ocurre al mover la línea temporal; solo se fuerza con `Recalcular archivo`.
+- El frontend muestra estado de cache, overlay de mapa, cross-section expandible y reproducción temporal más estable.
+- La cross-section distingue mejor el estado visual, mantiene `SFC / MAX` y añade referencias `Bajo / Medio / Alto`.
+
+## Estructura principal
+- `src/riesgo_engelamiento/`: pipeline científico, contratos y utilidades de cache.
+- `src/backend/main.py`: API FastAPI para salud, metadata, mapa, cross-section y recálculo.
+- `src/frontend/`: cliente React/Vite de `Aerofrost`.
+- `tests/`: cobertura backend y del pipeline reproducible.
+- `outputs/`: artefactos exportados por el CLI.
+- `cache/derived/`: artefactos operativos reutilizados por la API.
 
 ## Quick Start
-1. Instalar dependencias para desarrollo y pruebas: `uv sync --extra dev`
-2. Ejecutar la validación y las fases 2, 5 y 6 contra el dataset del repositorio: `uv run riesgo-engelamiento --time-index 0`
-3. Ejecutar el entregable final canónico, que genera el mapa y resumen de presentación con nombre `presentation_final_deliverable_*`: `uv run riesgo-engelamiento --time-index 0 --final-deliverable`
-4. Revisar los artefactos generados en `outputs/`
+1. Instala dependencias Python: `uv sync --extra dev`
+2. Ejecuta el pipeline base: `uv run riesgo-engelamiento --time-index 0`
+3. Genera el entregable final: `uv run riesgo-engelamiento --time-index 0 --final-deliverable`
+4. Ejecuta tests: `uv run --extra dev pytest`
 
-## UI Interactiva "Aero-Frost"
-La nueva interfaz visual interactiva permite consultar el riesgo de engelamiento sobre un mapa y ver perfiles de corte transversal (cross-sections).
-Para lanzarla:
+## Aerofrost
 
-**Backend (FastAPI):**
-1. Instalar dependencias: `uv pip install -r src/backend/requirements.txt`
-2. Arrancar el servidor: `uv run python src/backend/main.py`
-   *(El servidor correrá en `http://127.0.0.1:8000`)*
+### Backend
+1. Instala dependencias del backend si aún no están: `uv pip install -r src/backend/requirements.txt`
+2. Arranca la API: `uv run python src/backend/main.py`
+3. La API queda en `http://127.0.0.1:8000`
 
-**Frontend (React/Vite):**
-1. Moverse a la carpeta del frontend: `cd src/frontend`
-2. Instalar dependencias: `npm install --legacy-peer-deps`
-3. Iniciar el modo de desarrollo: `npm run dev`
-   *(La interfaz web estará disponible en la URL indicada por Vite, usualmente `http://localhost:5173`)*
+### Frontend
+1. Entra en `src/frontend`
+2. Instala dependencias: `npm install`
+3. Arranca desarrollo: `npm run dev`
+4. Compila producción: `npm run build`
 
-Una vez abierta la interfaz web:
-- **Mapa:** Puedes explorar visualmente las zonas con overlay real servido por el backend.
-- **Modo de riesgo:** Alterna entre `Perfil generico` (máximo vertical por columna) y `Por flight level`, que sigue las franjas verticales disponibles en Python.
-- **Panel de control:** Usa la línea temporal inferior para seleccionar o reproducir automáticamente la hora de pronóstico.
-- **Cross-Section:** Haz clic en dos puntos diferentes del mapa para generar una línea de ruta. El panel inferior derecho mostrará automáticamente el corte transversal real entre ambos puntos, desde superficie hasta el nivel máximo del modelo.
-- **Vista ampliada:** El cross-section puede ampliarse para inspección detallada.
-- **Threat Indicator:** El indicador NACA en la esquina superior derecha cambiará dinámicamente mostrando la amenaza aerodinámica máxima detectada.
+### Flujo en la UI
+- `Perfil generico`: máximo vertical por columna.
+- `Por flight level`: usa las franjas verticales derivadas en Python solo para el mapa horizontal.
+- `Recalcular archivo`: rehace la cache del dataset activo.
+- Línea temporal: cambia de tiempo sin relanzar cálculo científico pesado.
+- Cross-section: selecciona dos puntos en el mapa para ver el perfil completo de superficie a máximo del modelo.
+- Vista ampliada: permite inspección más cómoda del perfil vertical.
 
-## Commands
-| Command | Description |
+## Comandos útiles
+| Comando | Descripción |
 |---|---|
-| `uv run riesgo-engelamiento --time-index 0` | Valida el dataset, genera el resumen de fase 1 y exporta los productos de fases 2, 5 y 6 |
-| `uv run riesgo-engelamiento --time-index 0 --final-deliverable` | Ejecuta el flujo anterior y ademas exporta el entregable final canónico, con nombre `presentation_final_deliverable_*`, para el tiempo seleccionado |
-| `uv run riesgo-engelamiento --time-index 0 --final-product` | Alias legado del entregable final; conserva el prefijo histórico `presentation_final_product_*` por compatibilidad |
-| `uv run riesgo-engelamiento --time-index 0 --final-deliverable --final-product-band upper --final-product-highlighted-count 3` | Genera el entregable canónico y, si se pide, el comparativo compacto de tiempos destacados como artefacto compañero |
-| `uv run --extra dev pytest` | Ejecuta la batería de pruebas |
+| `uv run riesgo-engelamiento --time-index 0` | Valida el dataset y genera productos de fases 1, 2, 5 y 6 |
+| `uv run riesgo-engelamiento --time-index 0 --final-deliverable` | Exporta el entregable final canónico `presentation_final_deliverable_*` |
+| `uv run riesgo-engelamiento --time-index 0 --final-product` | Usa el alias legado `presentation_final_product_*` |
+| `uv run riesgo-engelamiento --time-index 0 --final-deliverable --final-product-band upper --final-product-highlighted-count 3` | Genera el entregable final y el comparativo compacto de tiempos destacados |
+| `uv run --extra dev pytest` | Ejecuta toda la batería de pruebas |
+| `npm run build` | Compila el frontend de `Aerofrost` |
 
-## Architecture
-- `src/riesgo_engelamiento/dataset.py`: apertura y validación del NetCDF.
-- `src/riesgo_engelamiento/summary.py`: construcción del resumen legible y JSON.
-- `src/riesgo_engelamiento/phase2.py`: derivación de la máscara binaria líquida, salida NetCDF y mapa PNG.
-- `src/riesgo_engelamiento/phase5.py`: reconstrucción aproximada de theta, presión y riesgo de engelamiento.
-- `src/riesgo_engelamiento/phase3.py`: alias de compatibilidad para la Phase 5.
-- `src/riesgo_engelamiento/phase6.py`: severidad heurística canónica y rangos relativos de niveles.
-- `src/riesgo_engelamiento/final_product.py`: contrato, resumen y mapa del entregable final canónico, con compatibilidad para el alias legado.
-- `src/riesgo_engelamiento/phase4.py`: alias de compatibilidad para la severidad heurística.
-- `src/riesgo_engelamiento/cli.py`: entrada principal reproducible con `--final-deliverable` como ruta canónica.
+## API actual
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/health` | Estado básico del servicio |
+| `GET /api/map-metadata` | Metadata temporal, bounds y opciones verticales |
+| `GET /api/cache-status` | Estado de cache del dataset activo |
+| `POST /api/recalculate` | Recalcula la cache del dataset activo |
+| `GET /api/risk-map` | Overlay de mapa por tiempo, modo y banda |
+| `GET /api/cross-section` | Perfil vertical reutilizando base cacheada |
 
-## Project Docs
-- PRD: `specs/PRD_riesgo_engelamiento.md`
-- Plan: `plans/plan_riesgo_engelamiento.md`
-- Session handoff: `docs/session_2026-04-12_handoff.md`
-- ADRs: `docs/decisions/`
-- ADR canónico del entregable final: `docs/decisions/ADR-006-canonical-final-deliverable-mode.md`
+## Notas técnicas
+- El dataset por defecto es `wrfout_d01_2015-04-17_18_00_00_corte`.
+- La cache operativa vive en `cache/derived/` y se versiona con manifiesto.
+- `generic / flight-level` afecta solo al mapa; no cambia la semántica del perfil vertical.
+- La fase 5 sigue siendo una reconstrucción aproximada porque `PB` no está disponible.
+- La fase 6 sigue siendo heurística; no se han cambiado las fórmulas meteorológicas.
 
-## Notes
-- La constante base de temperatura potencial usada en esta primera fase es `T0 = 300 K`.
-- La salida de fase 1 es deliberadamente descriptiva: valida entradas, expone supuestos y deja marcadas las limitaciones del archivo.
-- La fase 2 produce una máscara binaria horizontal a partir de `QCLOUD + QRAIN` para un tiempo seleccionado.
-- La fase 5 reconstruye `theta = T + 300`, aproxima la presión desde `ZNW` y `P`, y etiqueta el riesgo como proxy documentado porque `PB` no está disponible.
-- La fase 6 clasifica la severidad de forma heurística a partir del riesgo aproximado, la fracción líquida, la coexistencia con hielo, la persistencia temporal y la ocupación relativa por bandas de `eta`.
-- El entregable final canónico usa el prefijo `presentation_final_deliverable_*`; el alias legado `--final-product` sigue generando `presentation_final_product_*` para compatibilidad.
-- Los artefactos técnicos siguen siendo `phase2_*`, `phase5_*` y `phase6_*`.
-- El comparativo de tiempos destacados sigue siendo un artefacto compañero, no el entregable canónico principal.
-
+## Documentación relacionada
+- `plans/task_mejora_estructural_visualizacion.md`
+- `plans/plan_riesgo_engelamiento.md`
+- `specs/PRD_riesgo_engelamiento.md`
+- `docs/decisions/`
