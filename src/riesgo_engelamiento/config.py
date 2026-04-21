@@ -20,7 +20,9 @@ FINAL_PRODUCT_RENDER_VIEWS = (
     "heuristic-severity",
 )
 FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PREFIX = "presentation_final_product_highlighted_times"
-FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE = "presentation/final-product/highlighted-times"
+FINAL_PRODUCT_HIGHLIGHTED_OUTPUT_PURPOSE = (
+    "presentation/final-product/highlighted-times"
+)
 FINAL_PRODUCT_CAVEAT_LABELS = (
     "selected-time presentation wrapper over diagnostic phases",
     "diagnostic source remains a proxy, not an operational forecast",
@@ -96,6 +98,25 @@ FINAL_PRODUCT_VERTICAL_BAND_MEANINGS = {
     "middle": "Middle relative eta band of the model-level stack",
     "lower": "Lower relative eta band of the model-level stack",
 }
+ROUTE_PROFILE_OUTPUT_PREFIX = "route_icing_profile"
+ROUTE_PROFILE_OUTPUT_PURPOSE = "presentation/route-icing-profile"
+ROUTE_PROFILE_REQUIRED_METADATA_FIELDS = (
+    "artifact_kind",
+    "output_purpose",
+    "dataset_path",
+    "selected_time_index",
+    "selected_time_label",
+    "route_start",
+    "route_end",
+    "route_point_count",
+    "distance_km_total",
+    "vertical_levels",
+    "profile_shape",
+    "severity_range",
+    "severity_formula",
+    "source_metrics",
+    "outputs",
+)
 APPROXIMATE_PRESSURE_TOP_PA = 5000.0
 APPROXIMATE_PRESSURE_SURFACE_PA = 100000.0
 APPROXIMATE_POISSON_KAPPA = 0.286
@@ -177,4 +198,3 @@ class DiagnosticStatus:
     name: str
     status: str
     reason: str
-
