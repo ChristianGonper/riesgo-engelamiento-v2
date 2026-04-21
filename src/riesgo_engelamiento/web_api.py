@@ -116,8 +116,8 @@ def build_map_metadata(dataset: xr.Dataset, dataset_path: str | Path) -> dict[st
         "timeCount": time_count,
         "times": times,
         "riskModes": [
-            {"id": "generic", "label": "Perfil generico"},
-            {"id": "flight-level", "label": "Por flight level"},
+            {"id": "generic", "label": "Perfil general"},
+            {"id": "flight-level", "label": "Por capa vertical"},
         ],
         "verticalSelection": {
             "kind": "python-band",
