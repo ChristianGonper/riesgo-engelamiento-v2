@@ -8,6 +8,27 @@ Pipeline reproducible en Python para validar una salida WRF, documentar sus limi
 3. Ejecutar el entregable final canónico, que genera el mapa y resumen de presentación con nombre `presentation_final_deliverable_*`: `uv run riesgo-engelamiento --time-index 0 --final-deliverable`
 4. Revisar los artefactos generados en `outputs/`
 
+## UI Interactiva "Aero-Frost"
+La nueva interfaz visual interactiva permite consultar el riesgo de engelamiento sobre un mapa y ver perfiles de corte transversal (cross-sections).
+Para lanzarla:
+
+**Backend (FastAPI):**
+1. Instalar dependencias: `uv pip install -r src/backend/requirements.txt`
+2. Arrancar el servidor: `uv run python src/backend/main.py`
+   *(El servidor correrá en `http://127.0.0.1:8000`)*
+
+**Frontend (React/Vite):**
+1. Moverse a la carpeta del frontend: `cd src/frontend`
+2. Instalar dependencias: `npm install --legacy-peer-deps`
+3. Iniciar el modo de desarrollo: `npm run dev`
+   *(La interfaz web estará disponible en la URL indicada por Vite, usualmente `http://localhost:5173`)*
+
+Una vez abierta la interfaz web:
+- **Mapa:** Puedes explorar visualmente las zonas (rojo = severo, amarillo = moderado, etc.).
+- **Panel de control:** Usa los sliders de la parte inferior para seleccionar la altitud (FL) y la hora de pronóstico.
+- **Cross-Section:** Haz clic en dos puntos diferentes del mapa para generar una línea de ruta. El panel inferior derecho mostrará automáticamente el corte transversal (perfil vertical) entre ambos puntos.
+- **Threat Indicator:** El indicador NACA en la esquina superior derecha cambiará dinámicamente mostrando la amenaza aerodinámica máxima detectada.
+
 ## Commands
 | Command | Description |
 |---|---|
