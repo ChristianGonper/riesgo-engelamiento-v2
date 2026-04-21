@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 from riesgo_engelamiento.cache_store import IcingCacheStore
 from riesgo_engelamiento.config import EXPECTED_DIMS_BY_VARIABLE
+from riesgo_engelamiento.severity_volume import build_severity_volume
 from riesgo_engelamiento.web_api import _severity_to_overlay_rgba
 
 
@@ -167,6 +168,18 @@ def test_risk_map_overlay_keeps_zero_severity_transparent(
 
     assert rgba[0, 0, 3] == 0.0
     assert rgba[0, 1, 3] > 0.0
+
+
+def test_severity_volume_zero_risk_cells_remain_zero(tmp_path: Path) -> None:
+    dataset = _build_backend_dataset()
+    severity_3d, _, _ = build_severity_volume(
+        dataset, tmp_path / "dataset", time_index=0
+    )
+    values = np.asarray(severity_3d.values, dtype=np.float32)
+
+    assert np.all(
+        values[np.asarray(dataset.isel(Time=0)["QCLOUD"].values) == 0.0] == 0.0
+    )
 
 
 def test_risk_map_rejects_invalid_vertical_option(monkeypatch, tmp_path: Path) -> None:

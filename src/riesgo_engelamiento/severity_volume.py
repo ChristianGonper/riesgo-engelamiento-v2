@@ -36,6 +36,7 @@ def build_severity_volume(
         + 0.15 * mixed_3d.astype(np.float32)
         + 0.10 * coherence_3d
     ) * 100.0
+    severity_3d = xr.where(risk_3d > 0, severity_3d, 0.0)
     severity_3d = severity_3d.clip(0.0, 100.0).astype(np.float32)
     formula = "100 * (0.50*risk_presence + 0.25*liquid_presence + 0.15*mixed_phase + 0.10*coherence)"
     source_metrics = {
